@@ -53,7 +53,7 @@ export interface FiltersInput {
 
 export interface TicketService {
   snapshot(): TicketSnapshot
-  refresh(): Promise<TicketSnapshot>
+  refresh(signal?: AbortSignal): Promise<TicketSnapshot>
   saveTab(input: TabInput): Promise<TicketSnapshot>
   setFilters(input: FiltersInput): Promise<TicketSnapshot>
   deleteTab(id: number): TicketSnapshot
@@ -92,8 +92,8 @@ export function createTicketService(options: {
     refreshing: running !== null,
   })
 
-  const resolveSiteUrl = (): Promise<string | undefined> => {
-    siteUrl ??= acli.run(authStatusArgs()).then((result) => {
+  const resolveSiteUrl = (signal?: AbortSignal): Promise<string | undefined> => {
+    siteUrl ??= acli.run(authStatusArgs(), signal).then((result) => {
       const site = classifyFailure(result, 'auth') ? undefined : parseSiteUrl(result.stdout)
       if (!site) siteUrl = null
       return site
@@ -108,9 +108,9 @@ export function createTicketService(options: {
     reportedHealth = health
   }
 
-  const searchAndTrackHealth = async (jql: string): Promise<SearchResult> => {
+  const searchAndTrackHealth = async (jql: string, signal?: AbortSignal): Promise<SearchResult> => {
     try {
-      const result = await search(jql)
+      const result = await search(jql, signal)
       setHealth('ok', null)
       return result
     } catch (error) {
@@ -120,11 +120,12 @@ export function createTicketService(options: {
     }
   }
 
-  const search = async (jql: string): Promise<SearchResult> => {
-    const result = await acli.run(searchArgs(jql, TICKET_LIMIT + 1))
+  const search = async (jql: string, signal?: AbortSignal): Promise<SearchResult> => {
+    const result = await acli.run(searchArgs(jql, TICKET_LIMIT + 1), signal)
+    signal?.throwIfAborted()
     const failure = classifyFailure(result, 'search')
     if (failure) throw failure
-    const found = parseSearch(result.stdout, await resolveSiteUrl())
+    const found = parseSearch(result.stdout, await resolveSiteUrl(signal))
     return { issues: found.slice(0, TICKET_LIMIT), limitReached: found.length > TICKET_LIMIT }
   }
 
@@ -137,20 +138,26 @@ export function createTicketService(options: {
 
   const valuesOf = (base: SearchResult): TabValues => ({ fieldValues: fieldValues(base.issues), valuesLimitReached: base.limitReached })
 
-  const readTab = async ({ jql, filters }: Pick<Tab, 'jql' | 'filters'>, knownValues?: TabValues): Promise<TabList> => {
+  const readTab = async (
+    { jql, filters }: Pick<Tab, 'jql' | 'filters'>,
+    { knownValues, signal }: { knownValues?: TabValues; signal?: AbortSignal } = {},
+  ): Promise<TabList> => {
     if (filters.length === 0) {
-      const base = await searchAndTrackHealth(jql)
+      const base = await searchAndTrackHealth(jql, signal)
       return listOf(base, valuesOf(base))
     }
-    const values = knownValues ?? valuesOf(await searchAndTrackHealth(jql))
-    return listOf(await searchAndTrackHealth(effectiveJql(jql, filters)), values)
+    const values = knownValues ?? valuesOf(await searchAndTrackHealth(jql, signal))
+    return listOf(await searchAndTrackHealth(effectiveJql(jql, filters), signal), values)
   }
 
-  const refreshNow = async (): Promise<TicketSnapshot> => {
+  const refreshNow = async (signal?: AbortSignal): Promise<TicketSnapshot> => {
     for (const tab of tabs.list()) {
       try {
-        tabs.recordList(tab, await readTab(tab))
+        const list = await readTab(tab, { signal })
+        signal?.throwIfAborted()
+        tabs.recordList(tab, list)
       } catch (error) {
+        if (signal?.aborted) break
         tabs.recordError(tab, errorMessage(error))
         if (healthOf(error)) break
       }
@@ -167,8 +174,8 @@ export function createTicketService(options: {
 
   return {
     snapshot,
-    refresh() {
-      running ??= refreshNow().finally(() => {
+    refresh(signal) {
+      running ??= refreshNow(signal).finally(() => {
         running = null
       })
       return running
@@ -186,7 +193,7 @@ export function createTicketService(options: {
     async setFilters({ id, filters }) {
       const existing = tabs.get(id)
       if (!existing) throw new TabNotFoundError(id)
-      tabs.setFilters(existing, filters, await readTab({ jql: existing.jql, filters }, tabs.state(id)))
+      tabs.setFilters(existing, filters, await readTab({ jql: existing.jql, filters }, { knownValues: tabs.state(id) }))
       return snapshot()
     },
     deleteTab(id) {

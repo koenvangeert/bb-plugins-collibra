@@ -82,6 +82,41 @@ describe('ticket service', () => {
     expect(tickets.snapshot().refreshing).toBe(false)
   })
 
+  it('stops an aborted refresh without more acli calls, errors or health changes', async () => {
+    const controller = new AbortController()
+    const acli = fakeAcli({
+      search: () => {
+        controller.abort()
+        return LOGGED_OUT
+      },
+    })
+    const { tickets, tabs, onHealth } = service(acli)
+    tabs.insert('Second', 'second jql')
+
+    const snapshot = await tickets.refresh(controller.signal)
+
+    expect(searches(acli)).toHaveLength(1)
+    expect(snapshot.tabs.map((tab) => tab.error)).toEqual([null, null])
+    expect(snapshot.health).toBe('ok')
+    expect(onHealth).not.toHaveBeenCalled()
+  })
+
+  it('keeps the last list when the refresh is aborted while it reads the site URL', async () => {
+    const controller = new AbortController()
+    const acli = fakeAcli({
+      search: SEARCH_OK,
+      auth: () => {
+        controller.abort()
+        return { exitCode: 1 }
+      },
+    })
+    const { tickets } = service(acli)
+
+    const snapshot = await tickets.refresh(controller.signal)
+
+    expect(firstTab(snapshot)).toMatchObject({ tickets: [], refreshedAt: null, error: null })
+  })
+
   it('reports a logged-out acli once, and recovery after the next good refresh', async () => {
     let result: object = LOGGED_OUT
     const { tickets, onHealth } = service(fakeAcli({ search: () => result }))

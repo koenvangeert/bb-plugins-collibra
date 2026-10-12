@@ -40,7 +40,7 @@ export const createPlugin = (acli: AcliRunner) => async function plugin(bb: BbPl
       runRefreshLoop({
         signal,
         readMinutes: async () => (await settings.get()).refreshMinutes,
-        refresh: () => tickets.refresh(),
+        refresh: (signal) => tickets.refresh(signal),
         onError: (message, error) =>
           bb.log.warn(`${message}: ${error instanceof Error ? error.message : String(error)}`),
       }),
