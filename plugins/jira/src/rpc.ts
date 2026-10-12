@@ -2,7 +2,7 @@ import { defineRpcContract } from '@get-bb/plugin-sdk'
 import { z } from 'zod'
 import { EMPTY_VALUE, FIELD_IDS, SEARCHABLE_FIELD_IDS, type Filter } from './filterFields'
 import { isQuotedLiteral } from './filterJql'
-import type { ThreadLinks } from './threadLinks'
+import type { SavedPullRequest, ThreadLinks } from './threadLinks'
 import { buildPrompt, isTicketKey } from './tickets'
 import type { FiltersInput, TabInput, TicketService, TicketSnapshot } from './ticketService'
 
@@ -27,7 +27,14 @@ const filter: z.ZodType<Filter> = z.object({
   values: z.array(filterValue).min(1),
 })
 
-const linkedThread = z.object({ threadId: z.string(), title: z.string(), archived: z.boolean() })
+const pullRequest: z.ZodType<SavedPullRequest> = z.object({
+  number: z.number().int().positive(),
+  title: z.string(),
+  url: z.url({ protocol: /^https?$/ }),
+  state: z.enum(['closed', 'draft', 'merged', 'open']),
+})
+
+const linkedThread = z.object({ threadId: z.string(), title: z.string(), archived: z.boolean(), pullRequest: pullRequest.nullable() })
 
 const tab = z.object({
   id: z.number(),
@@ -77,6 +84,10 @@ export const rpcContract = defineRpcContract({
   threadLink: { input: threadInput, output: threadLink },
   link: { input: z.object({ threadId: z.string().min(1), key: ticketKey }).strict(), output: threadLink },
   unlink: { input: threadInput, output: z.object({ ok: z.literal(true) }) },
+  savePullRequest: {
+    input: z.object({ threadId: z.string().min(1), pullRequest }).strict(),
+    output: z.object({ ok: z.literal(true) }),
+  },
   projects: { input: z.null(), output: z.array(z.object({ id: z.string(), name: z.string() })) },
   startThread: {
     input: z.object({ projectId: z.string().min(1), key: ticketKey, prompt: z.string().trim().min(1) }).strict(),
@@ -117,6 +128,10 @@ export function createRpcHandlers(deps: {
     link: ({ threadId, key }: { threadId: string; key: string }) => links.link(threadId, key),
     unlink: async ({ threadId }: { threadId: string }) => {
       await links.unlink(threadId)
+      return { ok: true as const }
+    },
+    savePullRequest: async ({ threadId, pullRequest }: { threadId: string; pullRequest: SavedPullRequest }) => {
+      links.savePullRequest(threadId, pullRequest)
       return { ok: true as const }
     },
     projects: async () => (await listProjects()).map(({ id, name }) => ({ id, name })),

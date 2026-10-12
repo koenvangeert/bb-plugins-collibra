@@ -33,6 +33,7 @@ export const createPlugin = (acli: AcliRunner) => async function plugin(bb: BbPl
     createRpcHandlers({ tickets, links, listProjects: () => bb.sdk.projects.list({ includePersonal: true }) }),
   );
 
+  bb.events.on("thread.created", ({ thread }) => links.inheritLink(thread));
   bb.events.on("thread.deleted", ({ thread }) => links.onThreadDeleted(thread.id));
 
   bb.background.service("ticket-refresh", {

@@ -1,4 +1,4 @@
-import type { SqlDatabase } from './database'
+import { inTransaction, type SqlDatabase } from './database'
 import { errorMessage } from './errorMessage'
 import { InvalidKeyError, isTicketKey, type Ticket } from './tickets'
 import type { TicketService } from './ticketService'
@@ -37,10 +37,18 @@ export interface ThreadLink {
   error: string | null
 }
 
+export interface SavedPullRequest {
+  number: number
+  title: string
+  url: string
+  state: 'closed' | 'draft' | 'merged' | 'open'
+}
+
 export interface LinkedThread {
   threadId: string
   title: string
   archived: boolean
+  pullRequest: SavedPullRequest | null
 }
 
 export function createThreadLinks(options: { db: SqlDatabase; sdk: ThreadLinkSdk; tickets: TicketService }) {
@@ -92,6 +100,14 @@ export function createThreadLinks(options: { db: SqlDatabase; sdk: ThreadLinkSdk
       return { issueKey, ticket, error: null }
     },
 
+    async inheritLink(thread: { id: string; parentThreadId: string | null }): Promise<void> {
+      if (!thread.parentThreadId) return
+      const issueKey = await linkedKey(thread.parentThreadId)
+      if (!issueKey || (await linkedKey(thread.id))) return
+      await sdk.threads.updatePluginMetadata({ threadId: thread.id, set: { issueKey } })
+      index(thread.id, issueKey)
+    },
+
     async unlink(threadId: string): Promise<void> {
       await sdk.threads.updatePluginMetadata({ threadId, remove: ['issueKey'] })
       unindex(threadId)
@@ -116,10 +132,13 @@ export function createThreadLinks(options: { db: SqlDatabase; sdk: ThreadLinkSdk
 
     async linkedThreads(keys: ReadonlySet<string>): Promise<Record<string, LinkedThread[]>> {
       const rows = (
-        db.prepare('SELECT thread_id, issue_key FROM thread_links ORDER BY rowid').all() as {
-          thread_id: string
-          issue_key: string
-        }[]
+        db
+          .prepare(
+            `SELECT l.thread_id, l.issue_key, p.number, p.title, p.url, p.state
+             FROM thread_links l LEFT JOIN thread_pull_requests p ON p.thread_id = l.thread_id
+             ORDER BY l.rowid`,
+          )
+          .all() as ({ thread_id: string; issue_key: string } & (SavedPullRequest | NullFields<SavedPullRequest>))[]
       ).filter((row) => keys.has(row.issue_key))
       const resolved = await Promise.all(
         rows.map(async (row) => {
@@ -128,7 +147,8 @@ export function createThreadLinks(options: { db: SqlDatabase; sdk: ThreadLinkSdk
             if (thread.deletedAt !== null) return void unindexIfStill(row.thread_id, row.issue_key)
             const current = await linkedKey(row.thread_id)
             if (current !== row.issue_key) return void reindexIfStill(row.thread_id, row.issue_key, current)
-            return { issueKey: row.issue_key, thread: toLinkedThread(thread) }
+            const pullRequest = row.number === null ? null : { number: row.number, title: row.title, url: row.url, state: row.state }
+            return { issueKey: row.issue_key, thread: toLinkedThread(thread, pullRequest) }
           } catch {
             return undefined
           }
@@ -139,16 +159,31 @@ export function createThreadLinks(options: { db: SqlDatabase; sdk: ThreadLinkSdk
       return byKey
     },
 
+    savePullRequest(threadId: string, { number, title, url, state }: SavedPullRequest): void {
+      db.prepare(
+        `INSERT INTO thread_pull_requests (thread_id, number, title, url, state) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (thread_id) DO UPDATE SET number = excluded.number, title = excluded.title, url = excluded.url, state = excluded.state`,
+      ).run(threadId, number, title, url, state)
+    },
+
     onThreadDeleted(threadId: string): void {
-      unindex(threadId)
+      inTransaction(db, () => {
+        unindex(threadId)
+        db.prepare('DELETE FROM thread_pull_requests WHERE thread_id = ?').run(threadId)
+      })
     },
   }
 }
 
 export type ThreadLinks = ReturnType<typeof createThreadLinks>
 
-function toLinkedThread(thread: { id: string; title: string | null; titleFallback: string | null; archivedAt: number | null }) {
-  return { threadId: thread.id, title: threadTitle(thread.title, thread.titleFallback), archived: thread.archivedAt !== null }
+type NullFields<T> = { [K in keyof T]: null }
+
+function toLinkedThread(
+  thread: { id: string; title: string | null; titleFallback: string | null; archivedAt: number | null },
+  pullRequest: SavedPullRequest | null,
+): LinkedThread {
+  return { threadId: thread.id, title: threadTitle(thread.title, thread.titleFallback), archived: thread.archivedAt !== null, pullRequest }
 }
 
 function threadTitle(title: string | null, fallback: string | null): string {

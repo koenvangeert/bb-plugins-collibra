@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   experimental_useSidebarThreadPullRequest,
@@ -23,6 +23,8 @@ import { usePolled } from "./usePolled";
 import "./threadStatus.css";
 
 type TicketRow = TicketTab["tickets"][number];
+type LinkedThread = TicketRow["threads"][number];
+type SavedPullRequest = NonNullable<LinkedThread["pullRequest"]>;
 
 type TabAction = { kind: "add" } | { kind: "edit" | "delete"; tab: TicketTab } | { kind: "filter"; tabId: number; index: number | null };
 
@@ -119,9 +121,24 @@ function threadStateOf(thread: PluginSidebarThread | undefined): ThreadState {
   return "idle";
 }
 
-function ThreadChip({ thread }: { thread: TicketRow["threads"][number] }) {
+function samePullRequest(a: SavedPullRequest | null, b: SavedPullRequest | null) {
+  return a?.number === b?.number && a?.title === b?.title && a?.url === b?.url && a?.state === b?.state;
+}
+
+function useLatestPullRequest(thread: LinkedThread): SavedPullRequest | null {
+  const rpc = useRpc<typeof rpcContract>();
+  const { pullRequest: live } = experimental_useSidebarThreadPullRequest(thread.threadId);
+  const latest = live ? { number: live.number, title: live.title, url: live.url, state: live.state } : null;
+  const unsaved = latest && !samePullRequest(latest, thread.pullRequest) ? latest : null;
+  useEffect(() => {
+    if (unsaved) rpc.call("savePullRequest", { threadId: thread.threadId, pullRequest: unsaved }).catch(() => {});
+  }, [rpc, thread.threadId, unsaved?.number, unsaved?.title, unsaved?.url, unsaved?.state]);
+  return latest ?? thread.pullRequest;
+}
+
+function ThreadChip({ thread }: { thread: LinkedThread }) {
   const navigate = useBbNavigate();
-  const { pullRequest } = experimental_useSidebarThreadPullRequest(thread.threadId);
+  const pullRequest = useLatestPullRequest(thread);
   const { threads } = experimental_useSidebarThreads();
   const state = threadStateOf(threads.find(({ id }) => id === thread.threadId));
   const prState = pullRequest ? PULL_REQUEST_STATES[pullRequest.state] : null;
