@@ -122,8 +122,8 @@ describe('rpc handlers', () => {
     const list = rpcContract.tickets.output.parse(await rpc.tickets())
 
     expect(list.tabs.map((entry) => entry.tickets[0]!.threads)).toEqual([
-      [{ threadId: 'thr_1', title: 'Fix it', archived: false }],
-      [{ threadId: 'thr_1', title: 'Fix it', archived: false }],
+      [{ threadId: 'thr_1', title: 'Fix it', archived: false, pullRequest: null }],
+      [{ threadId: 'thr_1', title: 'Fix it', archived: false, pullRequest: null }],
     ])
     expect(threadReads).toEqual(['thr_1'])
   })
@@ -152,7 +152,7 @@ describe('rpc handlers', () => {
     expect(rpcContract.link.output.parse(await rpc.link({ threadId: 'thr_1', key: 'ABC-12' }))).toMatchObject({ issueKey: 'ABC-12' })
     expect(rpcContract.threadLink.output.parse(await rpc.threadLink({ threadId: 'thr_1' }))).toMatchObject({ issueKey: 'ABC-12' })
     const list = rpcContract.tickets.output.parse(await rpc.tickets())
-    expect(list.tabs[0]!.tickets[0]!.threads).toEqual([{ threadId: 'thr_1', title: 'Fix it', archived: false }])
+    expect(list.tabs[0]!.tickets[0]!.threads).toEqual([{ threadId: 'thr_1', title: 'Fix it', archived: false, pullRequest: null }])
 
     expect(rpcContract.unlink.output.parse(await rpc.unlink({ threadId: 'thr_1' }))).toEqual({ ok: true })
     expect((await rpc.threadLink({ threadId: 'thr_1' })).issueKey).toBeNull()

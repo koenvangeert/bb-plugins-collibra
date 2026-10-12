@@ -26,8 +26,8 @@ const tab = (overrides: Partial<TicketTab> = {}): TicketTab => ({
   filters: [],
   tickets: [
     ticket("ABC-12", "Fix login", "In Progress", [
-      { threadId: "thr_1", title: "Fix login thread", archived: false },
-      { threadId: "thr_2", title: "Old attempt", archived: true },
+      { threadId: "thr_1", title: "Fix login thread", archived: false, pullRequest: null },
+      { threadId: "thr_2", title: "Old attempt", archived: true, pullRequest: null },
     ]),
     ticket("ABC-40", "Add export", "To Do"),
   ],
@@ -80,6 +80,20 @@ const pullRequest = (number: number, state: PullRequests[string]["state"]): Pull
   state,
   attention: "none",
 });
+
+const savedPullRequest = (number: number, state: PullRequests[string]["state"]) => {
+  const { attention: _, ...saved } = pullRequest(number, state);
+  return saved;
+};
+
+const withSavedPullRequest = (saved: ReturnType<typeof savedPullRequest>) =>
+  list({
+    tickets: [
+      ticket("ABC-12", "Fix login", "In Progress", [
+        { threadId: "thr_1", title: "Fix login thread", archived: true, pullRequest: saved },
+      ]),
+    ],
+  });
 
 describe("Jira page", () => {
   it("shows a loading state until the list arrives", async () => {
@@ -137,6 +151,38 @@ describe("Jira page", () => {
     expect(slot.inspection.navigateCalls).toEqual([
       expect.objectContaining({ url: "https://github.com/acme/app/pull/412" }),
     ]);
+  });
+
+  it("shows the saved pull request of a thread when BB has no live one", async () => {
+    const slot = renderPage({ tickets: () => withSavedPullRequest(savedPullRequest(300, "merged")) });
+
+    expect(await slot.findByRole("button", { name: "PR #300 (merged)" })).toBeTruthy();
+  });
+
+  it("saves a live pull request that differs from the saved one", async () => {
+    const savePullRequest = vi.fn(() => ({ ok: true as const }));
+    const slot = renderPage(
+      { tickets: () => withSavedPullRequest(savedPullRequest(412, "open")), savePullRequest },
+      { thr_1: pullRequest(412, "merged") },
+    );
+
+    expect(await slot.findByRole("button", { name: "PR #412 (merged)" })).toBeTruthy();
+    await vi.waitFor(() =>
+      expect(savePullRequest).toHaveBeenCalledWith({ threadId: "thr_1", pullRequest: savedPullRequest(412, "merged") }),
+    );
+  });
+
+  it("does not save a live pull request that matches the saved one", async () => {
+    const savePullRequest = vi.fn(() => ({ ok: true as const }));
+    const slot = renderPage(
+      { tickets: () => withSavedPullRequest(savedPullRequest(412, "open")), savePullRequest },
+      { thr_1: pullRequest(412, "open") },
+    );
+
+    await slot.findByRole("button", { name: "PR #412 (open)" });
+    await act(async () => {});
+
+    expect(savePullRequest).not.toHaveBeenCalled();
   });
 
   it.each([

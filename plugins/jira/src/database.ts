@@ -66,6 +66,13 @@ export const MIGRATIONS = [
     url TEXT NOT NULL,
     position INTEGER NOT NULL
   )`,
+  `CREATE TABLE thread_pull_requests (
+    thread_id TEXT PRIMARY KEY,
+    number INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    state TEXT NOT NULL
+  )`,
 ]
 
 export function inTransaction<T>(db: SqlDatabase, work: () => T): T {

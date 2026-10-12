@@ -5,8 +5,9 @@ Shows my Jira tickets in BB and links BB threads to them. It reads Jira through 
 ## What it adds
 
 - A `Jira` page in the sidebar with one tab per JQL query. Each tab shows its ticket count, and lists its tickets with status and the threads linked to each ticket.
-- Each linked thread shows the pull request of its branch, when it has one: `#412` with an icon and colour for open, draft, merged, or closed. Click it to open the PR. Archived threads often show no PR, because BB does not always have them loaded.
+- Each linked thread shows the pull request of its branch, when it has one: `#412` with an icon and colour for open, draft, merged, or closed. Click it to open the PR. The plugin saves the last PR it saw, so an archived thread keeps its PR. A thread archived before the Jira page saw its PR shows none.
 - **Start thread** on a ticket: pick a project, edit the first prompt, and start a thread that is linked to the ticket.
+- A thread that a linked thread starts (a child thread) gets the same ticket.
 - A control in the thread header. A linked thread shows `KEY · Status`. An unlinked thread shows **Link Jira**, where you pick a ticket from any tab or type a key.
 
 ## Tabs
