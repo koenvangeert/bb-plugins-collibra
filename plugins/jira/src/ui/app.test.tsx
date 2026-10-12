@@ -3,6 +3,7 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { loadPluginApp, renderSlot, type CapturedPluginApp } from "@get-bb/plugin-sdk/testing/app";
+import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { Filter } from "../filterFields";
 import type { ThreadLinkResult, TicketList, TicketTab } from "../rpc";
 import { TICKET_LIMIT } from "../tickets";
@@ -65,9 +66,12 @@ afterEach(() => cleanup());
 
 type PullRequests = NonNullable<NonNullable<Parameters<typeof renderSlot>[2]>["sidebarPullRequests"]>;
 
-function renderPage(rpc: RpcHandlers, sidebarPullRequests: PullRequests = {}) {
-  return renderSlot(app.navPanels[0]!, { subPath: "" }, { rpc, openUrl: () => true, sidebarPullRequests });
+function renderPage(rpc: RpcHandlers, sidebarPullRequests: PullRequests = {}, threads: PluginSidebarThread[] = []) {
+  return renderSlot(app.navPanels[0]!, { subPath: "" }, { rpc, openUrl: () => true, sidebarPullRequests, sidebarThreads: { threads } });
 }
+
+const sidebarThread = (id: string, overrides: Partial<PluginSidebarThread> = {}) =>
+  ({ id, status: "idle", hasPendingInteraction: false, indicator: "none", ...overrides }) as PluginSidebarThread;
 
 const pullRequest = (number: number, state: PullRequests[string]["state"]): PullRequests[string] => ({
   number,
@@ -133,6 +137,26 @@ describe("Jira page", () => {
     expect(slot.inspection.navigateCalls).toEqual([
       expect.objectContaining({ url: "https://github.com/acme/app/pull/412" }),
     ]);
+  });
+
+  it.each([
+    ["running", { status: "active" }],
+    ["needs-you", { status: "active", hasPendingInteraction: true }],
+    ["ready", { indicator: "unread-success" }],
+    ["failed", { status: "error" }],
+    ["idle", {}],
+  ] as const)("marks a %s thread on its chip", async (state, overrides) => {
+    const slot = renderPage({ tickets: () => list() }, {}, [sidebarThread("thr_1", overrides)]);
+
+    const chip = (await slot.findByText("Fix login thread")).closest("button")!;
+    expect(chip.dataset.threadState).toBe(state);
+  });
+
+  it("marks a thread missing from the sidebar as idle", async () => {
+    const slot = renderPage({ tickets: () => list() });
+
+    const chip = (await slot.findByText("Old attempt")).closest("button")!;
+    expect(chip.dataset.threadState).toBe("idle");
   });
 
   it("says when no ticket matches the query", async () => {
