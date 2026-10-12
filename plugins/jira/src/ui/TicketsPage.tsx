@@ -1,6 +1,12 @@
 import { useCallback, useState } from "react";
 import type { ReactNode } from "react";
-import { experimental_useSidebarThreadPullRequest, useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
+import {
+  experimental_useSidebarThreadPullRequest,
+  experimental_useSidebarThreads,
+  useBbNavigate,
+  useRpc,
+  type PluginSidebarThread,
+} from "@get-bb/plugin-sdk/app";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
@@ -14,6 +20,7 @@ import { formatRefreshTime } from "./format";
 import { StartThreadDialog } from "./StartThreadDialog";
 import { DeleteTabDialog, TabDialog } from "./TabDialog";
 import { usePolled } from "./usePolled";
+import "./threadStatus.css";
 
 type TicketRow = TicketTab["tickets"][number];
 
@@ -93,18 +100,41 @@ const PULL_REQUEST_STATES = {
   closed: { icon: "GitPullRequestClosed", className: "border-red-500/30 text-red-600 dark:text-red-400" },
 } as const;
 
+type ThreadState = "running" | "needs-you" | "ready" | "failed" | "idle";
+
+const THREAD_STATE_LABELS: Record<ThreadState, string> = {
+  running: "Running",
+  "needs-you": "Needs you",
+  ready: "Ready",
+  failed: "Failed",
+  idle: "Idle",
+};
+
+function threadStateOf(thread: PluginSidebarThread | undefined): ThreadState {
+  if (!thread) return "idle";
+  if (thread.hasPendingInteraction) return "needs-you";
+  if (thread.status === "error" || thread.indicator === "unread-error") return "failed";
+  if (thread.status !== "idle") return "running";
+  if (thread.indicator === "unread-success") return "ready";
+  return "idle";
+}
+
 function ThreadChip({ thread }: { thread: TicketRow["threads"][number] }) {
   const navigate = useBbNavigate();
   const { pullRequest } = experimental_useSidebarThreadPullRequest(thread.threadId);
+  const { threads } = experimental_useSidebarThreads();
+  const state = threadStateOf(threads.find(({ id }) => id === thread.threadId));
   const prState = pullRequest ? PULL_REQUEST_STATES[pullRequest.state] : null;
   return (
     <li className="inline-flex max-w-full items-center gap-1">
       <button
         type="button"
         className={cn(
-          "inline-flex max-w-72 cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-2 py-0.5 text-xs hover:bg-state-hover",
+          "thread-chip inline-flex max-w-72 cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-2 py-0.5 text-xs hover:bg-state-hover",
           thread.archived && "opacity-60",
         )}
+        data-thread-state={state}
+        title={THREAD_STATE_LABELS[state]}
         onClick={() => navigate.toThread(thread.threadId)}
       >
         <Icon name="MessageSquare" className="size-3 text-muted-foreground" aria-hidden />

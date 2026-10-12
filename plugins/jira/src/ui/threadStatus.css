@@ -1,0 +1,85 @@
+@property --thread-orbit {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.thread-chip[data-thread-state="running"] {
+  --thread-tone: var(--success);
+}
+
+.thread-chip[data-thread-state="ready"] {
+  --thread-tone: var(--timeline-accent);
+}
+
+.thread-chip[data-thread-state="needs-you"] {
+  border-color: color-mix(in oklab, var(--attention) 50%, transparent);
+  background: color-mix(in oklab, var(--attention) 15%, var(--background));
+}
+
+.thread-chip[data-thread-state="failed"] {
+  border-color: color-mix(in oklab, var(--destructive) 40%, transparent);
+  background: color-mix(in oklab, var(--destructive) 5%, var(--background));
+  color: var(--destructive);
+}
+
+.thread-chip[data-thread-state="running"],
+.thread-chip[data-thread-state="ready"] {
+  --thread-edge: color-mix(in oklab, var(--thread-tone) 45%, var(--border));
+  --thread-metal: color-mix(in oklab, var(--thread-tone) 70%, var(--foreground));
+  --thread-light: color-mix(in oklab, var(--thread-tone) 25%, var(--background));
+  position: relative;
+  isolation: isolate;
+  border-color: transparent;
+  background: color-mix(in oklab, var(--thread-tone) 10%, var(--background));
+}
+
+.thread-chip[data-thread-state="running"]::before,
+.thread-chip[data-thread-state="ready"]::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--thread-orbit),
+    var(--thread-edge) 0deg,
+    var(--thread-metal) 55deg,
+    var(--thread-light) 117deg,
+    var(--thread-metal) 138deg,
+    var(--thread-edge) 185deg,
+    var(--thread-light) 285deg,
+    var(--thread-metal) 305deg,
+    var(--thread-edge) 350deg
+  );
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: thread-orbit 3.8s linear infinite;
+}
+
+.thread-chip[data-thread-state="running"]::after,
+.thread-chip[data-thread-state="ready"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  box-shadow: 0 2px 7px color-mix(in oklab, var(--thread-tone) 17%, transparent);
+}
+
+@keyframes thread-orbit {
+  to {
+    --thread-orbit: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thread-chip::before {
+    animation: none;
+    --thread-orbit: 115deg;
+  }
+}
