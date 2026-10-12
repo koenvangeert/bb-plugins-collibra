@@ -12,13 +12,13 @@ export interface AcliResult {
 }
 
 export interface AcliRunner {
-  run(args: string[]): Promise<AcliResult>
+  run(args: string[], signal?: AbortSignal): Promise<AcliResult>
 }
 
 export type ExecFile = (
   file: string,
   args: readonly string[],
-  options: { timeout: number; maxBuffer: number },
+  options: { timeout: number; maxBuffer: number; signal?: AbortSignal },
   callback: (error: (Error & { code?: unknown; killed?: boolean }) | null, stdout: string, stderr: string) => void,
 ) => void
 
@@ -47,10 +47,10 @@ export function authStatusArgs(): string[] {
 
 export function createExecFileRunner(execFile: ExecFile = nodeExecFile as unknown as ExecFile): AcliRunner {
   return {
-    run: (args) =>
+    run: (args, signal) =>
       new Promise((resolve) => {
         try {
-          execFile('acli', args, { timeout: ACLI_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
+          execFile('acli', args, { timeout: ACLI_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024, signal }, (error, stdout, stderr) => {
             resolve(toResult(error, String(stdout ?? ''), String(stderr ?? '')))
           })
         } catch (error) {

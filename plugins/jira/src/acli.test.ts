@@ -59,6 +59,15 @@ describe('createExecFileRunner', () => {
     expect(calls[0]!.options.shell).toBeUndefined()
   })
 
+  it('hands the abort signal to execFile so an abort kills acli', async () => {
+    const { execFile, calls } = recordingExecFile()
+    const { signal } = new AbortController()
+
+    await createExecFileRunner(execFile).run(['x'], signal)
+
+    expect(calls[0]!.options.signal).toBe(signal)
+  })
+
   it('returns the exit code and output of a failed command', async () => {
     const { execFile } = recordingExecFile({ stderr: 'unauthorized', code: 1 })
 

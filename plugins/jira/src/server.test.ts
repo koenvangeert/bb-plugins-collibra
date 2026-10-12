@@ -78,6 +78,19 @@ describe('jira plugin server', () => {
     })
   })
 
+  it('stops the ticket-refresh service while acli is still running', async () => {
+    const hungUntilAbort = (_args: string[], signal?: AbortSignal) =>
+      new Promise<{ exitCode: number }>((resolve) => signal?.addEventListener('abort', () => resolve({ exitCode: 1 })))
+    const acli = fakeAcli({ search: hungUntilAbort })
+    const harness = await start(acli)
+    const service = harness.behavior.runService('ticket-refresh')
+    await expect.poll(() => acli.calls.length).toBe(1)
+
+    service.controller.abort()
+
+    await expect(service.done).resolves.toBeUndefined()
+  })
+
   it('drops the link of a deleted thread', async () => {
     const harness = await start(fakeAcli({ search: { stdout: fixture('search.json') } }))
     await refreshOnce(harness)
