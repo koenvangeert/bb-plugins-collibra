@@ -72,8 +72,8 @@ There is no `jql` setting. Tabs hold the queries. An earlier custom `jql` value 
 ## Development
 
 ```bash
-npm install --include=dev
-npm test && npm run typecheck
+bun install
+bun run test && bun run typecheck
 bb plugin build
 ```
 
