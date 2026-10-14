@@ -57,8 +57,8 @@ Set `CLAUDE_CONFIG_DIR` on the BB server to read a relocated Claude Code install
 ## Development
 
 ```bash
-npm install --include=dev
-npm test && npm run typecheck
+bun install
+bun run test && bun run typecheck
 bb plugin build
 ```
 

@@ -60,5 +60,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "bb plugin build"
-  }
+  },
+  "trustedDependencies": [
+    "better-sqlite3"
+  ]
 }
