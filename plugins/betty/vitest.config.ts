@@ -1,6 +1,11 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "better-sqlite3": new URL("./src/betterSqliteShim.ts", import.meta.url).pathname,
+    },
+  },
   test: {
     environment: "node",
     server: { deps: { inline: ["@get-bb/plugin-sdk"] } },
