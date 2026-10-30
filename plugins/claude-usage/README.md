@@ -27,7 +27,7 @@ Every figure is a lower bound. The price table reproduces Claude Code's own `cos
 
 The plugin keeps its index in its own SQLite database. Claude Code prunes transcripts after about a month, so the index is the only record of older periods:
 
-- Rows hold token counts per transcript, UTC hour, model, and working directory. Dollars come from the price table on every read, so a corrected rate re-prices all history.
+- Rows hold token counts per transcript, UTC hour, model, and working directory. Dollars come from the price table on every read, so a corrected rate re-prices all history. The one exception is a prompt-length tier such as Haiku 5.5's: it is chosen per response when a transcript is indexed, so it applies to transcripts indexed from then on.
 - Re-reading a transcript replaces that transcript's rows only.
 - Rows of a deleted transcript stay forever. **Rescan transcripts** merges and never rebuilds.
 

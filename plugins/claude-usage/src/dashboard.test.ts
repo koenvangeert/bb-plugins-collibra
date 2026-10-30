@@ -105,6 +105,42 @@ describe('buildDashboard', () => {
     expect(dashboard.byModel).toEqual([])
   })
 
+  it('prices Claude Haiku 5.5 at the short-prompt rates up to exactly 100K prompt tokens', () => {
+    const haiku = response({
+      model: 'claude-haiku-5-5',
+      tokens: { input: 100_000, output: 1_000_000, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0 },
+    })
+
+    const dashboard = buildDashboard(indexOf(haiku), map, NOW)
+
+    expect(dashboard.unpricedModels).toEqual([])
+    expect(dashboard.totals.allTime.total).toBeCloseTo(0.51, 9)
+  })
+
+  it('prices each Haiku 5.5 response whose prompt is over 100K tokens at the long-prompt rates', () => {
+    const short = response({
+      messageId: 'msg_short',
+      model: 'claude-haiku-5-5-20261001',
+      tokens: { input: 60_000, output: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0 },
+    })
+    const long = response({
+      messageId: 'msg_long',
+      model: 'claude-haiku-5-5-20261001',
+      tokens: { input: 1_000, output: 1_000_000, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 100_000 },
+    })
+    const index = emptySpendIndex()
+    mergeTranscript(index, 'haiku.jsonl', indexTranscript([short, long], { sizeBytes: 1, modifiedAt: 1 }))
+
+    const dashboard = buildDashboard(index, map, NOW)
+
+    expect(dashboard.unpricedModels).toEqual([])
+    expect(dashboard.totals.allTime.total).toBeCloseTo(0.006 + 0.0005 + 2.5 + 0.005, 9)
+    expect(dashboard.byModel.map((entry) => entry.model)).toEqual([
+      'claude-haiku-5-5 (prompts over 100K)',
+      'claude-haiku-5-5',
+    ])
+  })
+
   it('omits a zero-token model from the unpriced warning, since it costs nothing either way', () => {
     const free = response({
       model: '<synthetic>',
