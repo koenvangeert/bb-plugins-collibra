@@ -20,6 +20,19 @@ const OPUS_5_5: ModelPrice = { input: 4, output: 20, cacheWrite5m: 5, cacheWrite
 const OPUS: ModelPrice = { input: 5, output: 25, cacheWrite5m: 6.25, cacheWrite1h: 10, cacheRead: 0.5 }
 const SONNET: ModelPrice = { input: 2, output: 10, cacheWrite5m: 2.5, cacheWrite1h: 4, cacheRead: 0.2 }
 const HAIKU: ModelPrice = { input: 1, output: 5, cacheWrite5m: 1.25, cacheWrite1h: 2, cacheRead: 0.1 }
+const HAIKU_5_5: ModelPrice = { input: 0.1, output: 0.5, cacheWrite5m: 0.125, cacheWrite1h: 0.2, cacheRead: 0.01 }
+
+/**
+ * Anthropic prices each such request by its own prompt length, counting cache
+ * reads and writes, so the tier has to be chosen before responses are summed.
+ */
+const LONG_PROMPT_TIERS: Readonly<Record<string, { overPromptTokens: number; priceKey: string; price: ModelPrice }>> = {
+  'claude-haiku-5-5': {
+    overPromptTokens: 100_000,
+    priceKey: 'claude-haiku-5-5 (prompts over 100K)',
+    price: { input: 0.5, output: 2.5, cacheWrite5m: 0.625, cacheWrite1h: 1, cacheRead: 0.05 },
+  },
+}
 
 export const PRICE_TABLE: Readonly<Record<string, ModelPrice>> = {
   'claude-opus-5-5': OPUS_5_5,
@@ -31,7 +44,9 @@ export const PRICE_TABLE: Readonly<Record<string, ModelPrice>> = {
   'claude-sonnet-5': SONNET,
   'claude-sonnet-4-6': SONNET,
   'claude-sonnet-4-5': SONNET,
+  'claude-haiku-5-5': HAIKU_5_5,
   'claude-haiku-4-5': HAIKU,
+  ...Object.fromEntries(Object.values(LONG_PROMPT_TIERS).map((tier) => [tier.priceKey, tier.price])),
 }
 
 export const EMPTY_TOKENS: Readonly<TokenTotals> = {
@@ -51,6 +66,13 @@ export const EMPTY_TOKENS: Readonly<TokenTotals> = {
  */
 export function normalizeModelId(modelId: string): string {
   return modelId.split('[')[0]!.trim().replace(/-\d{8}$/, '')
+}
+
+export function billedModelId(modelId: string, tokens: TokenTotals): string {
+  const tier = LONG_PROMPT_TIERS[normalizeModelId(modelId)]
+  if (!tier) return modelId
+  const promptTokens = tokens.input + tokens.cacheWrite5m + tokens.cacheWrite1h + tokens.cacheRead
+  return promptTokens > tier.overPromptTokens ? tier.priceKey : modelId
 }
 
 export function isPricedModel(modelId: string): boolean {

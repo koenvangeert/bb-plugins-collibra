@@ -1,4 +1,4 @@
-import { addTokens, type TokenTotals } from './pricing'
+import { addTokens, billedModelId, type TokenTotals } from './pricing'
 import type { BilledResponse } from './transcript'
 
 export interface IndexedTranscript {
@@ -51,7 +51,7 @@ export function indexTranscript(
 ): IndexedTranscript {
   const rows = new Map<string, TokenTotals>()
   for (const response of responses) {
-    const key = rowKey(response.cwd, utcHourOf(response.timestamp), response.model)
+    const key = rowKey(response.cwd, utcHourOf(response.timestamp), billedModelId(response.model, response.tokens))
     const existing = rows.get(key)
     rows.set(key, existing ? addTokens(existing, response.tokens) : response.tokens)
   }
