@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   definePluginApp,
+  experimental_Icon as Icon,
   experimental_useRpcMutation,
   experimental_useRpcQuery,
   useBbNavigate,
@@ -8,7 +9,8 @@ import {
   type PluginThreadHeaderActionProps,
 } from '@get-bb/plugin-sdk/app'
 import { rpcContract } from './src/rpc'
-import { chipLabel, type ThreadRun } from './src/runChip'
+import { chipLabel, chipProgress, type ThreadRun } from './src/runChip'
+import { OUTCOME_STYLE } from './src/runs/board'
 import { PullRequestChip, RunsPage } from './src/ui/RunsPage'
 import { SignInGate } from './src/ui/SignInGate'
 
@@ -35,8 +37,16 @@ function ThreadRunHeader({ threadId, isCompactViewport }: PluginThreadHeaderActi
 
   if (run.kind === 'linked') {
     return (
-      <button type="button" className="h-7 rounded-md px-2 text-xs hover:bg-accent" onClick={() => navigate.openThreadPanel({ actionId: RUN_TAB })}>
-        {isCompactViewport ? 'BETTY' : chipLabel(run.chip)}
+      <button
+        type="button"
+        title={chipLabel(run.chip)}
+        aria-label={chipLabel(run.chip)}
+        className="flex h-7 items-center gap-1.5 rounded-md px-2 text-xs tabular-nums hover:bg-accent"
+        onClick={() => navigate.openThreadPanel({ actionId: RUN_TAB })}
+      >
+        <Icon name="Workflow" className="size-3.5" aria-hidden />
+        <span className={`size-2 rounded-full ${OUTCOME_STYLE[run.chip?.status ?? 'unknown'].fill}`} />
+        {run.chip && !isCompactViewport && chipProgress(run.chip)}
       </button>
     )
   }

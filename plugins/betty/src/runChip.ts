@@ -48,5 +48,9 @@ export function runChip(run: RunDetail): RunChip {
 
 export function chipLabel(chip: RunChip | null): string {
   if (!chip) return 'BETTY · unknown'
-  return `BETTY · ${STATUS_LABEL[chip.status]} · ${chip.nodesDone}/${chip.nodesTotal} · $${chip.costUsd.toFixed(2)}`
+  return `BETTY · ${STATUS_LABEL[chip.status]} · ${chipProgress(chip)}`
+}
+
+export function chipProgress(chip: RunChip): string {
+  return `${chip.nodesDone}/${chip.nodesTotal} · $${chip.costUsd.toFixed(2)}`
 }

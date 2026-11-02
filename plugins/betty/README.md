@@ -36,7 +36,7 @@ Change it with `bb plugin config betty set baseUrl https://...`.
 
 - A thread links to one BETTY run. The link is `{ runId }` in the thread's `betty` plugin metadata, so it stays after a bb restart.
 - Status, steps and spend come live from `pesto_dag_status`. The plugin stores nothing else.
-- The thread header shows `BETTY · Running · 6/14 · $4.10`. A click opens the "BETTY run" tab. The header reads the run again every 30 seconds.
+- The thread header shows the BETTY icon, a dot in the status colour, and the steps and spend, for example `6/14 · $4.10`. Hover shows the full label, `BETTY · Running · 6/14 · $4.10`. A click opens the "BETTY run" tab. The header reads the run again every 30 seconds.
 - When BETTY cannot be read, the header shows `BETTY · unknown` and the tab shows the error or the sign-in button.
 - A thread with no run shows "Run with BETTY". The ticket key comes from the `jira` plugin metadata (`issueKey`).
 - "Run with BETTY" sends a prompt to the agent of the same thread. The agent starts the run with the pesto MCP, then calls `betty_link_run`.

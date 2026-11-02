@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPlugin } from '../server'
 import { createFakeBetty } from './auth/fakeBetty'
 import { createFakePesto, fixture } from './pesto/fakePesto'
-import { chipLabel, runChip, runStatus } from './runChip'
+import { chipLabel, chipProgress, runChip, runStatus } from './runChip'
 import type { NodeStatus } from './pesto/types'
 import { runDetailSchema } from './pesto/wire'
 
@@ -105,6 +105,7 @@ describe('run status', () => {
     expect(chip).toEqual({ status: 'needs_decision', nodesDone: 4, nodesTotal: 8, costUsd: 4.1 })
     expect(chipLabel({ status: 'running', nodesDone: 6, nodesTotal: 14, costUsd: 4.1 })).toBe('BETTY · Running · 6/14 · $4.10')
     expect(chipLabel(null)).toBe('BETTY · unknown')
+    expect(chipProgress({ status: 'running', nodesDone: 6, nodesTotal: 14, costUsd: 4.1 })).toBe('6/14 · $4.10')
   })
 })
 
