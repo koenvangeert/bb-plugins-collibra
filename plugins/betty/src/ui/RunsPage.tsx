@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { experimental_useRpcQuery, useBbNavigate } from '@get-bb/plugin-sdk/app'
+import { useState, type ReactNode } from 'react'
+import { experimental_useRpcQuery, useBbNavigate, type PluginNavPanelProps } from '@get-bb/plugin-sdk/app'
 import type { PullRequest, RunSummary } from '../pesto/types'
 import { rpcContract } from '../rpc'
 import {
@@ -15,12 +15,12 @@ import {
   type TileId,
 } from '../runs/board'
 import { RECENT_DAYS, RUN_LIST_LIMIT } from '../runs/myRuns'
+import { RunDetail } from './RunDetail'
+import { money, useRefresh } from './shared'
 import { SignInGate } from './SignInGate'
 
-const REFRESH_MS = 30_000
 const FINISHED_SHOWN = 8
 
-const money = (usd: number) => `$${usd.toFixed(2)}`
 const clock = (at: number) => new Date(at).toLocaleTimeString('en-GB', { hour12: false })
 const dateTime = (at: string) => new Date(at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 const dayLabel = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
@@ -34,14 +34,23 @@ function ago(at: string, now: number): string {
   return `${Math.round(minutes / (24 * 60))}d ago`
 }
 
-export function RunsPage() {
+export function RunsPage({ subPath }: PluginNavPanelProps) {
+  const navigate = useBbNavigate()
   return (
     <div className="h-full min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto box-border flex w-full max-w-6xl flex-col gap-5 px-4 pb-6 pt-4 md:px-6">
-        <h2 className="m-0 text-lg font-semibold">My BETTY runs</h2>
-        <SignInGate>
-          <RunBoard />
-        </SignInGate>
+        {subPath ? (
+          <button
+            type="button"
+            className="self-start text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => navigate.toPluginPanel('runs', { subPath: '' })}
+          >
+            ← Back to runs
+          </button>
+        ) : (
+          <h2 className="m-0 text-lg font-semibold">My BETTY runs</h2>
+        )}
+        <SignInGate>{subPath ? <RunDetail runId={subPath} /> : <RunBoard />}</SignInGate>
       </div>
     </div>
   )
@@ -49,13 +58,8 @@ export function RunsPage() {
 
 function RunBoard() {
   const query = experimental_useRpcQuery({ contract: rpcContract, method: 'myRuns', input: null })
-  const { refetch } = query
   const [filter, setFilter] = useState<TileId | null>(null)
-
-  useEffect(() => {
-    const timer = setInterval(() => void refetch(), REFRESH_MS)
-    return () => clearInterval(timer)
-  }, [refetch])
+  useRefresh(query.refetch)
 
   if (query.error && !query.data) return <p role="alert" className="text-sm text-destructive">{query.error.message}</p>
   if (!query.data) return <p className="text-sm text-muted-foreground">Loading runs.</p>
@@ -260,14 +264,20 @@ function GroupSection({ group, now }: { group: RunGroup; now: number }) {
 }
 
 function RunRow({ run, now }: { run: RunSummary; now: number }) {
+  const navigate = useBbNavigate()
   const outcome = OUTCOME_STYLE[run.outcome]
   const { nodesDone, nodesTotal } = run.progress
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-sm">
       <span className={`w-32 shrink-0 text-xs font-medium ${outcome.text}`}>{outcome.label}</span>
-      <span className="min-w-0 flex-1 truncate" title={run.title}>
+      <button
+        type="button"
+        className="min-w-0 flex-1 truncate text-left hover:underline"
+        title={run.title}
+        onClick={() => navigate.toPluginPanel('runs', { subPath: run.runId })}
+      >
         {run.title}
-      </span>
+      </button>
       <span className="flex w-28 shrink-0 items-center gap-2 text-xs text-muted-foreground" title={`${nodesDone}/${nodesTotal} nodes`}>
         <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
           <span

@@ -4,7 +4,9 @@ import { act, type ComponentType } from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { loadPluginApp, renderSlot, type CapturedPluginApp } from '@get-bb/plugin-sdk/testing/app'
 import type { AuthKind } from '../auth/state'
-import type { PullRequest, RunOutcome, RunSummary } from '../pesto/types'
+import dagStatus from '../fixtures/dag-status.json'
+import type { PullRequest, RunDetail, RunOutcome, RunSummary } from '../pesto/types'
+import { runDetailSchema } from '../pesto/wire'
 import type { MyRuns } from '../runs/myRuns'
 
 const REFRESHED_AT = Date.parse('2026-11-02T11:15:30Z')
@@ -57,6 +59,24 @@ function renderPage(myRuns: () => MyRuns | Promise<MyRuns>, state: AuthKind = 's
     rpc: { authStatus: () => ({ state }), startSignIn: () => ({ url: 'https://betty.test/oauth/authorize' }), myRuns },
   })
 }
+
+function renderDetail(runId: string, runDetail: () => RunDetail) {
+  return renderSlot(app.navPanels[0]!, { subPath: runId }, {
+    rpc: {
+      authStatus: () => ({ state: 'signed-in' }),
+      startSignIn: () => ({ url: 'https://betty.test/oauth/authorize' }),
+      myRuns: () => myRuns(),
+      runDetail,
+    },
+  })
+}
+
+const FIXTURE_DETAIL = runDetailSchema.parse(dagStatus)
+
+const detailWithBase = (base: string): RunDetail => ({
+  ...FIXTURE_DETAIL,
+  pullRequests: FIXTURE_DETAIL.pullRequests.map((pr) => ({ ...pr, base })),
+})
 
 const myRuns = (overrides: Partial<MyRuns> = {}): MyRuns => ({ refreshedAt: REFRESHED_AT, runs: RUNS, cutOff: false, unreadable: 0, ...overrides })
 
@@ -214,6 +234,90 @@ describe('BETTY runs page', () => {
 
     expect(slot.navigateCalls).toEqual([{ method: 'openUrl', url: 'https://betty.test/oauth/authorize' }])
     expect(load).not.toHaveBeenCalled()
+  })
+})
+
+describe('BETTY run detail', () => {
+  it('opens a run after a click on its title', async () => {
+    const slot = renderPage(() => myRuns())
+
+    await act(async () => (await slot.findByRole('button', { name: 'Rename the column' })).click())
+
+    expect(slot.navigateCalls).toEqual([{ method: 'toPluginPanel', path: 'runs', options: { subPath: 'Rename the column' } }])
+  })
+
+  it('shows the run title, outcome, spend and spend ceilings', async () => {
+    const slot = renderDetail('Rename the column', () => detailWithBase('main'))
+
+    expect(await slot.findByRole('heading', { name: 'Rename the column' })).toBeTruthy()
+    expect(slot.getByText('Watching CI')).toBeTruthy()
+    expect(slot.getByText(/^Spent/).textContent).toBe('Spent $3.66')
+    expect(slot.getByText(/^Clean run/).textContent).toBe('Clean run up to $93.00 · Worst case up to $105.00 (one attempt per step)')
+  })
+
+  it('warns when the pull request base is not main', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('release/2026.11'))
+
+    const section = await slot.findByRole('region', { name: 'Pull request #26731' })
+
+    expect(within(section).getByRole('status').textContent).toContain('Base is release/2026.11, not main. CI may run only a few checks')
+  })
+
+  it('does not warn when the pull request base is main', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'))
+
+    await slot.findByRole('region', { name: 'Pull request #26731' })
+
+    expect(slot.queryByText(/CI may run only a few checks/)).toBeNull()
+  })
+
+  it('opens the pull request and each comment on GitHub', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'))
+    const section = await slot.findByRole('region', { name: 'Pull request #26731' })
+
+    await act(async () => within(section).getByRole('button', { name: 'Open PR #26731' }).click())
+    await act(async () => within(section).getByRole('button', { name: 'Remediation by remediate-review' }).click())
+
+    expect(slot.navigateCalls).toEqual([
+      { method: 'openUrl', url: 'https://github.com/collibra/frontend/pull/26731' },
+      { method: 'openUrl', url: 'https://github.com/collibra/frontend/pull/26731#issuecomment-6473319138' },
+    ])
+    expect(within(section).getByText('Review by revalidate-app').parentElement!.textContent).toBe('Review by revalidate-appplanned')
+    expect(within(section).queryByRole('button', { name: 'Review by revalidate-app' })).toBeNull()
+  })
+
+  it('shows each step with its status, spend against budget and when it runs', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'))
+    const steps = await slot.findByRole('region', { name: 'Steps' })
+
+    const remediate = within(steps).getByRole('listitem', { name: 'remediate-review' })
+    expect(within(remediate).getByText('Done')).toBeTruthy()
+    expect(within(remediate).getByText('$0.56/$12.00')).toBeTruthy()
+    expect(within(remediate).getByText('After implement, review')).toBeTruthy()
+
+    const fix = within(steps).getByRole('listitem', { name: 'remediate-app' })
+    expect(within(fix).getByText('Skipped')).toBeTruthy()
+    expect(within(fix).getByText('Only when $validate-app.output.all_met == false')).toBeTruthy()
+
+    const teardown = within(steps).getByRole('listitem', { name: 'teardown-env' })
+    expect(within(teardown).getByText('script')).toBeTruthy()
+    expect(within(teardown).getByText('Always runs')).toBeTruthy()
+  })
+
+  it('goes back to the runs', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'))
+
+    await act(async () => (await slot.findByRole('button', { name: /Back to runs/ })).click())
+
+    expect(slot.navigateCalls).toEqual([{ method: 'toPluginPanel', path: 'runs', options: { subPath: '' } }])
+  })
+
+  it('shows why the run cannot be read', async () => {
+    const slot = renderDetail('gone', () => {
+      throw new Error('BETTY has no run gone.')
+    })
+
+    expect((await slot.findByRole('alert')).textContent).toContain('BETTY has no run gone.')
   })
 })
 
