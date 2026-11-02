@@ -87,9 +87,9 @@ const runId = z.object({ run_id: z.string() })
 
 export const runListSchema = z
   .object({
-    runs: z.array(z.unknown()),
+    runs: z.array(z.unknown()).default([]),
     runs_beyond_limit: z.number().default(0),
-    runs_matched: z.number(),
+    runs_matched: z.number().default(0),
   })
   .transform((list): RunList => {
     const runs: RunSummary[] = []

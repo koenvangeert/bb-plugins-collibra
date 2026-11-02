@@ -169,8 +169,15 @@ describe('PESTO client', () => {
     expect(read.unreadable).toEqual([list.runs[0].run_id])
   })
 
-  it('rejects a run list without runs with a PestoError', async () => {
-    const pesto = createFakePesto({ tools: { pesto_dag_status: { text: JSON.stringify({ runs_matched: 0 }) } } })
+  it('reads the live answer for no active runs as an empty list', async () => {
+    const pesto = createFakePesto({ tools: { pesto_dag_status: { text: fixture('run-list-none-active.json') } } })
+    const { client } = connect(pesto)
+
+    expect(await client.listRuns({ ownerDev: 'a@b.c' })).toEqual({ runs: [], unreadable: [], beyondLimit: 0, matched: 0 })
+  })
+
+  it('rejects a run list whose runs are not a list with a PestoError', async () => {
+    const pesto = createFakePesto({ tools: { pesto_dag_status: { text: JSON.stringify({ runs: 'none', runs_matched: 0 }) } } })
     const { client } = connect(pesto)
 
     await expect(client.listRuns({ ownerDev: 'a@b.c' })).rejects.toBeInstanceOf(PestoError)
