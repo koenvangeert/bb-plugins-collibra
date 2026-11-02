@@ -42,10 +42,22 @@ Change it with `bb plugin config betty set baseUrl https://...`.
 - "Run with BETTY" sends a prompt to the agent of the same thread. The agent starts the run with the pesto MCP, then calls `betty_link_run`.
 - The `betty_link_run` agent tool takes `{ runId }`. It checks the run exists, then writes the link for the calling thread. It never starts a new thread.
 
+## Run detail
+
+- Click a run title to open its detail. "Back to runs" goes back to the list.
+- The header shows the title, the outcome, the run id, and what the run spent.
+- "Clean run up to" adds the budgets of the steps that have no `when` condition. A clean run skips the conditional fix-up steps. "Worst case up to" adds the budgets of all steps. Budgets are per attempt, so a retried step can spend more.
+- Each pull request has an "Open PR" button, its repo, and `head → base`.
+- When the base is not `main`, the detail warns: CI may run only a few checks, so a green CI can mislead.
+- Below each pull request is the list of steps that acted on it (review, remediation, CI watch). Click an entry to open its review or comment on GitHub. An entry that has not happened yet shows "planned".
+- The steps show in columns. A step's column is its longest path from a first step. Each step shows its status, its spend against its budget (or its executor when it has no budget), and when it runs.
+- The detail reads the run again every 30 seconds.
+
 ## Status
 
 - The PESTO client reads your identity, the run list, one run's nodes, and artifacts.
 - The "BETTY run" tab shows the run id, status, steps, spend and pull requests of the linked run.
+- The runs page and the run detail are done.
 
 ## Develop
 
