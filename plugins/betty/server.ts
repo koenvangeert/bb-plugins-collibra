@@ -2,8 +2,10 @@ import type { BbPluginApi } from '@get-bb/plugin-sdk'
 import { createBettyAuth } from './src/auth/session'
 import { SIGN_IN_PROMPT } from './src/auth/state'
 import { createAuthStore, MIGRATIONS } from './src/auth/store'
-import { createMcpSession } from './src/pesto/mcp'
+import { createPestoClient } from './src/pesto/client'
+import { createMcpSession, PestoError } from './src/pesto/mcp'
 import { rpcContract } from './src/rpc'
+import { loadMyRuns } from './src/runs/myRuns'
 import { mcpEndpoint, SETTINGS } from './src/settings'
 
 const CALLBACK_PATH = '/oauth/callback'
@@ -36,6 +38,18 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
 
     const session = createMcpSession({ endpoint: () => mcpEndpoint(baseUrl), getToken: auth.token, fetch: fetchFn })
     bb.onDispose(() => session.close())
+    const pesto = createPestoClient(session)
+
+    let ownerEmail: Promise<string> | null = null
+    const owner = () => {
+      if (!ownerEmail) {
+        ownerEmail = pesto.whoami().then(requireEmail)
+        ownerEmail.catch(() => {
+          ownerEmail = null
+        })
+      }
+      return ownerEmail
+    }
 
     settings.onChange((next) => {
       if (next.baseUrl !== baseUrl) reload()
@@ -46,6 +60,7 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
       startSignIn: async () => ({
         url: await auth.startSignIn(`${bb.server.loopbackBaseUrl}/api/v1/plugins/${bb.pluginId}/http${CALLBACK_PATH}`),
       }),
+      myRuns: async () => loadMyRuns(pesto, await owner(), Date.now()),
     })
 
     bb.http.route(
@@ -69,6 +84,11 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
     const prompt = SIGN_IN_PROMPT[auth.state().kind]
     if (prompt) bb.status.needsConfiguration(prompt)
   }
+
+function requireEmail({ email }: { email: string | null }): string {
+  if (!email) throw new PestoError('BETTY did not tell bb your email, so bb cannot find your runs.')
+  return email
+}
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
