@@ -4,6 +4,7 @@ import {
   PULL_REQUEST_STATES,
   RUN_OUTCOMES,
   type Artifact,
+  type Identity,
   type PullRequest,
   type RunDetail,
   type RunList,
@@ -150,6 +151,10 @@ export const artifactSchema = z
       content: artifact.content,
     }),
   )
+
+export const identitySchema = z
+  .object({ email: z.string().optional() })
+  .transform((identity): Identity => ({ email: identity.email ?? null }))
 
 function budgetLimit(budget: string | undefined): number | null {
   const limit = budget?.match(/\/\$([\d.]+)/)?.[1]

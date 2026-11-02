@@ -83,3 +83,5 @@ export type Artifact = {
   sizeBytes: number
   content: string
 }
+
+export type Identity = { email: string | null }

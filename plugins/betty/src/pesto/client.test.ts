@@ -109,6 +109,23 @@ describe('PESTO client', () => {
     expect(pesto.toolCalls()[0]!.body!.params!.arguments).toEqual({ artifact_id: '5cf02d70-730c-4a4d-8668-cc0f752ad3b6' })
   })
 
+  it('reads the email of the signed-in user', async () => {
+    const pesto = createFakePesto({ tools: { pesto_whoami: { text: fixture('whoami.json') } } })
+    const { client } = connect(pesto)
+
+    const identity = await client.whoami()
+
+    expect(pesto.toolCalls()[0]!.body!.params).toEqual({ name: 'pesto_whoami', arguments: {} })
+    expect(identity).toEqual({ email: 'koen.vangeert@collibra.com' })
+  })
+
+  it('reads no email when BETTY runs on an api key', async () => {
+    const pesto = createFakePesto({ tools: { pesto_whoami: { text: JSON.stringify({ auth_mode: 'api_key' }) } } })
+    const { client } = connect(pesto)
+
+    expect(await client.whoami()).toEqual({ email: null })
+  })
+
   it('keeps an outcome or status it does not know as unknown', async () => {
     const list = JSON.parse(fixture('run-list.json'))
     list.runs[0].outcome = 'hibernating'
