@@ -61,7 +61,7 @@ function renderPage(myRuns: () => MyRuns | Promise<MyRuns>, state: AuthKind = 's
 const myRuns = (overrides: Partial<MyRuns> = {}): MyRuns => ({ refreshedAt: REFRESHED_AT, runs: RUNS, cutOff: false, unreadable: 0, ...overrides })
 
 describe('BETTY runs page', () => {
-  it('groups the runs and counts them in tiles with the total spend', async () => {
+  it('groups the runs in one line each', async () => {
     const slot = renderPage(() => myRuns())
 
     const decision = await slot.findByRole('region', { name: 'Needs a decision' })
@@ -73,16 +73,71 @@ describe('BETTY runs page', () => {
     expect(within(inFlight).getByText('Watching CI')).toBeTruthy()
     expect(within(finished).getByText('Add the KPI')).toBeTruthy()
     expect(within(finished).getByText('Drop the flag')).toBeTruthy()
-    expect(within(inFlight).getByText('4/15 nodes')).toBeTruthy()
+    expect(within(inFlight).getByText('4/15')).toBeTruthy()
     expect(within(inFlight).getByText('$2.25')).toBeTruthy()
-    expect(within(inFlight).getByText('1 Nov 2026, 10:30')).toBeTruthy()
-    const totals = slot.getByRole('region', { name: 'Totals' })
-    const tile = (label: string) => within(totals).getByText(label).parentElement!
-    expect(tile('Needs a decision').textContent).toBe('Needs a decision1')
-    expect(tile('In flight').textContent).toBe('In flight1')
-    expect(tile('Finished').textContent).toBe('Finished2')
-    expect(tile('Spend').textContent).toBe('Spend$6.75')
+    expect(within(inFlight).getByText('1d ago').getAttribute('title')).toBe('1 Nov 2026, 10:30')
     expect(slot.queryByRole('status')).toBeNull()
+  })
+
+  it('sums the runs up in tiles', async () => {
+    const slot = renderPage(() => myRuns())
+
+    const totals = await slot.findByRole('region', { name: 'Totals' })
+    const tile = (label: string) => within(totals).getByText(label).parentElement!.textContent
+
+    expect(tile('Needs a decision')).toBe('Needs a decision1waiting on you')
+    expect(tile('In flight')).toBe('In flight1running, watching CI or waiting')
+    expect(tile('Shipped')).toBe('Shipped11 PR merged, 1 open')
+    expect(tile('Broke')).toBe('Broke0failed or partly, 1 cancelled')
+    expect(tile('Spend')).toBe('Spend$6.75$1.69 per run')
+  })
+
+  it('shows the success rate and the outcome mix', async () => {
+    const slot = renderPage(() =>
+      myRuns({ runs: [...RUNS, run('Break the build', 'failed', 1), run('Ship the fix', 'succeeded', 1)] }),
+    )
+
+    const outcomes = await slot.findByRole('region', { name: 'Outcomes' })
+
+    expect(within(outcomes).getByText('67%')).toBeTruthy()
+    expect(within(outcomes).getByText('Succeeded').textContent).toBe('Succeeded2')
+    expect(within(outcomes).getByText('Failed').textContent).toBe('Failed1')
+  })
+
+  it('counts runs per day of last activity', async () => {
+    const slot = renderPage(() => myRuns())
+
+    const chart = await slot.findByRole('region', { name: 'Runs per day' })
+
+    expect(within(chart).getByTitle('1 Nov: 4 runs, $6.75')).toBeTruthy()
+    expect(within(chart).getByTitle('2 Nov: 0 runs, $0.00')).toBeTruthy()
+    expect(within(chart).getAllByTitle(/: \d+ runs?, /)).toHaveLength(14)
+  })
+
+  it('shows only the runs of a tile after a click on it', async () => {
+    const slot = renderPage(() => myRuns())
+
+    await act(async () => (await slot.findByRole('button', { name: /^In flight/ })).click())
+
+    expect(slot.getByText('Showing in flight only.')).toBeTruthy()
+    expect(slot.queryByText('Pick a schema')).toBeNull()
+    expect(slot.getByText('Rename the column')).toBeTruthy()
+
+    await act(async () => slot.getByRole('button', { name: 'Show all' }).click())
+
+    expect(slot.getByText('Pick a schema')).toBeTruthy()
+  })
+
+  it('shows the newest 8 finished runs until asked for all', async () => {
+    const finished = Array.from({ length: 10 }, (_, index) => run(`Finished ${index + 1}`, 'succeeded', 1))
+    const slot = renderPage(() => myRuns({ runs: finished }))
+
+    const section = await slot.findByRole('region', { name: 'Finished' })
+    expect(within(section).getAllByRole('listitem')).toHaveLength(8)
+
+    await act(async () => within(section).getByRole('button', { name: 'Show all 10' }).click())
+
+    expect(within(section).getAllByRole('listitem')).toHaveLength(10)
   })
 
   it('skips a group without runs', async () => {
@@ -139,12 +194,12 @@ describe('BETTY runs page', () => {
     let refreshedAt = REFRESHED_AT
     const load = vi.fn(() => myRuns({ refreshedAt }))
     const slot = renderPage(load)
-    expect(await slot.findByText('Updated 12:15:30')).toBeTruthy()
+    expect(await slot.findByText(/Updated 12:15:30$/)).toBeTruthy()
 
     refreshedAt += 30_000
     await act(async () => vi.advanceTimersByTime(30_000))
 
-    expect(await slot.findByText('Updated 12:16:00')).toBeTruthy()
+    expect(await slot.findByText(/Updated 12:16:00$/)).toBeTruthy()
     expect(load).toHaveBeenCalledTimes(2)
   })
 
