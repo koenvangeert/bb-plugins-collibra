@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createPlugin } from '../server'
 import { createFakeBetty } from './auth/fakeBetty'
 import { createFakePesto, fixture } from './pesto/fakePesto'
+import type { RunDetail } from './pesto/types'
 
 type Betty = ReturnType<typeof createFakeBetty>
 
@@ -154,16 +155,20 @@ describe('BETTY sign-in', () => {
   })
 })
 
+function bettyWithPesto(whoami: () => { text: string } = () => ({ text: fixture('whoami.json') })) {
+  const betty = createFakeBetty()
+  const pesto = createFakePesto({
+    tools: {
+      pesto_whoami: whoami,
+      pesto_dag_status: (args: Record<string, unknown>) => ({ text: fixture(args.run_id ? 'dag-status.json' : 'run-list.json') }),
+    },
+  })
+  const fetch: typeof globalThis.fetch = (input, init) =>
+    new URL(String(input)).pathname === '/mcp' ? pesto.fetch(input, init) : betty.fetch(input, init)
+  return { betty, pesto, fetch }
+}
+
 describe('my runs', () => {
-  function bettyWithPesto(whoami: () => { text: string }) {
-    const betty = createFakeBetty()
-    const pesto = createFakePesto({
-      tools: { pesto_whoami: whoami, pesto_dag_status: { text: fixture('run-list.json') } },
-    })
-    const fetch: typeof globalThis.fetch = (input, init) =>
-      new URL(String(input)).pathname === '/mcp' ? pesto.fetch(input, init) : betty.fetch(input, init)
-    return { betty, pesto, fetch }
-  }
 
   it('lists the runs of the signed-in user', async () => {
     vi.useFakeTimers({ now: Date.parse('2026-11-02T12:00:00Z') })
@@ -193,5 +198,33 @@ describe('my runs', () => {
 
     identity = JSON.parse(fixture('whoami.json'))
     await expect(host.harness.behavior.callRpc('myRuns', null)).resolves.toMatchObject({ cutOff: true })
+  })
+})
+
+describe('run detail', () => {
+  it('reads one run with its steps and pull request', async () => {
+    vi.useFakeTimers()
+    const { betty, pesto, fetch } = bettyWithPesto()
+    const host = await signedIn(betty, fetch)
+
+    const detail = (await host.harness.behavior.callRpc('runDetail', { runId: 'central-frontend-team-browser-validated-f153a0' })) as RunDetail
+
+    expect(pesto.toolCalls().at(-1)!.body!.params).toEqual({
+      name: 'pesto_dag_status',
+      arguments: { run_id: 'central-frontend-team-browser-validated-f153a0' },
+    })
+    expect(detail.runId).toBe('central-frontend-team-browser-validated-f153a0')
+    expect(detail.nodes).toHaveLength(15)
+    expect(detail.nodes.find((node) => node.name === 'remediate-review')).toMatchObject({ costUsd: 0.5587, budgetUsd: 12 })
+    expect(detail.pullRequests.map((pr) => [pr.number, pr.base])).toEqual([[26731, 'main']])
+  })
+
+  it('refuses an empty run id', async () => {
+    vi.useFakeTimers()
+    const { betty, pesto, fetch } = bettyWithPesto()
+    const host = await signedIn(betty, fetch)
+
+    await expect(host.harness.behavior.callRpc('runDetail', { runId: '' })).rejects.toThrow()
+    expect(pesto.toolCalls().filter((call) => call.body!.params!.name === 'pesto_dag_status')).toEqual([])
   })
 })
