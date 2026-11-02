@@ -43,9 +43,34 @@ export function runCondition(node: RunNode): string {
   return node.dependsOn.length === 0 ? 'Runs first' : `After ${node.dependsOn.join(', ')}`
 }
 
+const NOT_STARTED: ReadonlySet<NodeStatus> = new Set(['pending', 'skipped', 'unknown'])
+
+function cleanRunSkips(nodes: readonly RunNode[]): Set<string> {
+  const byName = new Map(nodes.map((node) => [node.name, node]))
+  const gated = new Map<string, boolean>()
+  const visiting = new Set<string>()
+
+  const isGated = (node: RunNode): boolean => {
+    const known = gated.get(node.name)
+    if (known !== undefined) return known
+    visiting.add(node.name)
+    const gatedDeps = node.dependsOn
+      .map((name) => byName.get(name))
+      .filter((dep): dep is RunNode => dep !== undefined && !visiting.has(dep.name) && isGated(dep))
+    visiting.delete(node.name)
+    const toleratesSkip = !NOT_STARTED.has(node.status) && gatedDeps.some((dep) => dep.status === 'skipped')
+    const result = node.when !== undefined || (!node.alwaysRun && gatedDeps.length > 0 && !toleratesSkip)
+    gated.set(node.name, result)
+    return result
+  }
+
+  return new Set(nodes.filter(isGated).map((node) => node.name))
+}
+
 export function spendCeilings(nodes: readonly RunNode[]): { cleanRunUsd: number; worstCaseUsd: number } {
   const total = (steps: readonly RunNode[]) => steps.reduce((sum, node) => sum + (node.budgetUsd ?? 0), 0)
-  return { cleanRunUsd: total(nodes.filter((node) => node.when === undefined)), worstCaseUsd: total(nodes) }
+  const skips = cleanRunSkips(nodes)
+  return { cleanRunUsd: total(nodes.filter((node) => !skips.has(node.name))), worstCaseUsd: total(nodes) }
 }
 
 const ACTION_LABEL = new Map([

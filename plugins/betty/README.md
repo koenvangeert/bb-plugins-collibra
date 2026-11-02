@@ -46,7 +46,8 @@ Change it with `bb plugin config betty set baseUrl https://...`.
 
 - Click a run title to open its detail. "Back to runs" goes back to the list.
 - The header shows the title, the outcome, the run id, and what the run spent.
-- "Clean run up to" adds the budgets of the steps that have no `when` condition. A clean run skips the conditional fix-up steps. "Worst case up to" adds the budgets of all steps. Budgets are per attempt, so a retried step can spend more.
+- "Clean run up to" adds the budgets of the steps that run when no condition fires. It leaves out the conditional fix-up steps (with a `when`) and the steps that wait on them, because PESTO skips those too. A step that waits on a fix-up step counts again when it already ran after that fix-up step was skipped, and an `always_run` step always counts. "Worst case up to" adds the budgets of all steps. Both count one attempt per step, so a retried step can spend more.
+- A pending run can show a clean run that is too low: a pending step that waits on a fix-up step counts as skipped until it runs.
 - Each pull request has an "Open PR" button, its repo, and `head → base`.
 - When the base is not `main`, the detail warns: CI may run only a few checks, so a green CI can mislead.
 - Below each pull request is the list of steps that acted on it (review, remediation, CI watch). Click an entry to open its review or comment on GitHub. An entry that has not happened yet shows "planned".

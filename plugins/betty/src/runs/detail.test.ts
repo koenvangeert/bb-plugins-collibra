@@ -47,10 +47,11 @@ describe('run detail', () => {
     expect(columns.map((column) => column.map((node) => node.name))).toEqual([['a'], ['b']])
   })
 
-  it('stops on a cycle and still places every step', () => {
-    const columns = dagColumns([step('a', { dependsOn: ['b'] }), step('b', { dependsOn: ['a'] })])
+  it('stops on a cycle and still places and prices every step', () => {
+    const cycle = [step('a', { dependsOn: ['b'], budgetUsd: 1 }), step('b', { dependsOn: ['a'], budgetUsd: 2 })]
 
-    expect(columns.flat().map((node) => node.name).sort()).toEqual(['a', 'b'])
+    expect(dagColumns(cycle).flat().map((node) => node.name).sort()).toEqual(['a', 'b'])
+    expect(spendCeilings(cycle)).toEqual({ cleanRunUsd: 3, worstCaseUsd: 3 })
   })
 
   it('shows a skipped step as skipped even when PESTO calls it succeeded', () => {
@@ -67,8 +68,19 @@ describe('run detail', () => {
     expect(runCondition(step('x', { when: 'ok', alwaysRun: true, dependsOn: ['a'] }))).toBe('Only when ok · Always runs')
   })
 
-  it('caps a clean run without the conditional steps and the worst case with all of them', () => {
-    expect(spendCeilings(nodes)).toEqual({ cleanRunUsd: 93, worstCaseUsd: 105 })
+  it('caps a clean run without the conditional steps and the steps that wait on them', () => {
+    expect(spendCeilings(nodes)).toEqual({ cleanRunUsd: 78, worstCaseUsd: 105 })
+  })
+
+  it('counts a pending step that waits on a conditional step out of a clean run', () => {
+    const pending = [
+      step('validate', { budgetUsd: 5 }),
+      step('fix', { when: 'failed', dependsOn: ['validate'], budgetUsd: 10 }),
+      step('revalidate', { dependsOn: ['fix'], budgetUsd: 3 }),
+      step('teardown', { dependsOn: ['revalidate'], alwaysRun: true, budgetUsd: 1 }),
+    ]
+
+    expect(spendCeilings(pending)).toEqual({ cleanRunUsd: 6, worstCaseUsd: 19 })
   })
 
   it('names what each step did on the pull request', () => {

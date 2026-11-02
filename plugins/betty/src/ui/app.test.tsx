@@ -252,7 +252,7 @@ describe('BETTY run detail', () => {
     expect(await slot.findByRole('heading', { name: 'Rename the column' })).toBeTruthy()
     expect(slot.getByText('Watching CI')).toBeTruthy()
     expect(slot.getByText(/^Spent/).textContent).toBe('Spent $3.66')
-    expect(slot.getByText(/^Clean run/).textContent).toBe('Clean run up to $93.00 · Worst case up to $105.00 (one attempt per step)')
+    expect(slot.getByText(/^Clean run/).textContent).toBe('Clean run up to $78.00 · Worst case up to $105.00 (one attempt per step)')
   })
 
   it('warns when the pull request base is not main', async () => {
