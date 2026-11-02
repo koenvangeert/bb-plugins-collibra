@@ -41,17 +41,26 @@ export function RunsPage({ subPath }: PluginNavPanelProps) {
     <div className="h-full min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto box-border flex w-full max-w-6xl flex-col gap-5 px-4 pb-6 pt-4 md:px-6">
         {subPath ? (
-          <button
-            type="button"
-            className="self-start text-sm text-muted-foreground hover:text-foreground"
-            onClick={() => navigate.toPluginPanel('runs', { subPath: '' })}
-          >
-            ← Back to runs
-          </button>
+          <>
+            <button
+              type="button"
+              className="self-start text-sm text-muted-foreground hover:text-foreground"
+              onClick={() => navigate.toPluginPanel('runs', { subPath: '' })}
+            >
+              ← Back to runs
+            </button>
+            <SignInGate>
+              <RunDetail runId={subPath} />
+            </SignInGate>
+          </>
         ) : (
-          <h2 className="m-0 text-lg font-semibold">My BETTY runs</h2>
+          <>
+            <h2 className="m-0 text-lg font-semibold">My BETTY runs</h2>
+            <SignInGate>
+              <RunBoard />
+            </SignInGate>
+          </>
         )}
-        <SignInGate>{subPath ? <RunDetail runId={subPath} /> : <RunBoard />}</SignInGate>
       </div>
     </div>
   )
