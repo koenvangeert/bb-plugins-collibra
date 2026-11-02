@@ -8,10 +8,10 @@ import { useRefresh } from './refresh'
 
 export function RunDetail({ runId }: { runId: string }) {
   const query = experimental_useRpcQuery({ contract: rpcContract, method: 'runDetail', input: { runId } })
-  const summary = experimental_useRpcQuery({ contract: rpcContract, method: 'myRuns', input: null }).data?.runs.find(
-    (run) => run.runId === runId,
-  )
+  const list = experimental_useRpcQuery({ contract: rpcContract, method: 'myRuns', input: null })
+  const summary = list.data?.runs.find((run) => run.runId === runId)
   useRefresh(query.refetch)
+  useRefresh(list.refetch)
 
   if (query.error && !query.data) return <p role="alert" className="text-sm text-destructive">{query.error.message}</p>
   if (!query.data) return <p className="text-sm text-muted-foreground">Loading the run.</p>

@@ -60,12 +60,12 @@ function renderPage(myRuns: () => MyRuns | Promise<MyRuns>, state: AuthKind = 's
   })
 }
 
-function renderDetail(runId: string, runDetail: () => RunDetail) {
+function renderDetail(runId: string, runDetail: () => RunDetail, list: () => MyRuns = () => myRuns()) {
   return renderSlot(app.navPanels[0]!, { subPath: runId }, {
     rpc: {
       authStatus: () => ({ state: 'signed-in' }),
       startSignIn: () => ({ url: 'https://betty.test/oauth/authorize' }),
-      myRuns: () => myRuns(),
+      myRuns: list,
       runDetail,
     },
   })
@@ -253,6 +253,18 @@ describe('BETTY run detail', () => {
     expect(slot.getByText('Watching CI')).toBeTruthy()
     expect(slot.getByText(/^Spent/).textContent).toBe('Spent $3.66')
     expect(slot.getByText(/^Clean run/).textContent).toBe('Clean run up to $78.00 · Worst case up to $105.00 (one attempt per step)')
+  })
+
+  it('reads the run outcome again every 30 seconds', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    let outcome: RunOutcome = 'watching_ci'
+    const slot = renderDetail('Rename the column', () => detailWithBase('main'), () => myRuns({ runs: [run('Rename the column', outcome, 2.25)] }))
+    expect(await slot.findByText('Watching CI')).toBeTruthy()
+
+    outcome = 'succeeded'
+    await act(async () => vi.advanceTimersByTime(30_000))
+
+    expect(await slot.findByText('Succeeded')).toBeTruthy()
   })
 
   it('warns when the pull request base is not main', async () => {

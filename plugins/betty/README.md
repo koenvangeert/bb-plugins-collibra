@@ -52,7 +52,7 @@ Change it with `bb plugin config betty set baseUrl https://...`.
 - When the base is not `main`, the detail warns: CI may run only a few checks, so a green CI can mislead.
 - Below each pull request is the list of steps that acted on it (review, remediation, CI watch). Click an entry to open its review or comment on GitHub. An entry that has not happened yet shows "planned".
 - The steps show in columns. A step's column is its longest path from a first step. Each step shows its status, its spend against its budget (or its executor when it has no budget), and when it runs.
-- The detail reads the run again every 30 seconds.
+- The detail reads the run and its outcome again every 30 seconds.
 
 ## Status
 
