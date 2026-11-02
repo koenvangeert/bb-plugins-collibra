@@ -6,7 +6,7 @@ export const RECENT_DAYS = 14
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-export type MyRuns = { refreshedAt: number; runs: RunSummary[]; cutOff: boolean }
+export type MyRuns = { refreshedAt: number; runs: RunSummary[]; cutOff: boolean; unreadable: number }
 
 export async function loadMyRuns(client: Pick<PestoClient, 'listRuns'>, ownerDev: string, now: number): Promise<MyRuns> {
   const [recent, active] = await Promise.all([
@@ -23,5 +23,6 @@ export async function loadMyRuns(client: Pick<PestoClient, 'listRuns'>, ownerDev
     refreshedAt: now,
     runs: [...byId.values()].sort((a, b) => Date.parse(b.lastStatusChangeAt) - Date.parse(a.lastStatusChangeAt)),
     cutOff: recent.beyondLimit > 0 || active.beyondLimit > 0,
+    unreadable: new Set([...recent.unreadable, ...active.unreadable]).size,
   }
 }

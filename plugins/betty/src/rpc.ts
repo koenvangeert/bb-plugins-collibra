@@ -28,7 +28,7 @@ const runSummary = z.object({
   ),
 }) satisfies z.ZodType<RunSummary>
 
-const myRuns = z.object({ refreshedAt: z.number(), runs: z.array(runSummary), cutOff: z.boolean() }) satisfies z.ZodType<MyRuns>
+const myRuns = z.object({ refreshedAt: z.number(), runs: z.array(runSummary), cutOff: z.boolean(), unreadable: z.number() }) satisfies z.ZodType<MyRuns>
 
 export const rpcContract = defineRpcContract({
   authStatus: { input: z.null(), output: z.object({ state: z.enum(AUTH_KINDS) }) },

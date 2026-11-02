@@ -50,6 +50,7 @@ export type RunSummary = {
 
 export type RunList = {
   runs: RunSummary[]
+  unreadable: string[]
   beyondLimit: number
   matched: number
 }

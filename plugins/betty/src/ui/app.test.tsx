@@ -58,7 +58,7 @@ function renderPage(myRuns: () => MyRuns | Promise<MyRuns>, state: AuthKind = 's
   })
 }
 
-const myRuns = (overrides: Partial<MyRuns> = {}): MyRuns => ({ refreshedAt: REFRESHED_AT, runs: RUNS, cutOff: false, ...overrides })
+const myRuns = (overrides: Partial<MyRuns> = {}): MyRuns => ({ refreshedAt: REFRESHED_AT, runs: RUNS, cutOff: false, unreadable: 0, ...overrides })
 
 describe('BETTY runs page', () => {
   it('groups the runs and counts them in tiles with the total spend', async () => {
@@ -112,6 +112,12 @@ describe('BETTY runs page', () => {
     const slot = renderPage(() => myRuns({ cutOff: true }))
 
     expect((await slot.findByRole('status')).textContent).toBe('Showing the newest 100 runs. Older runs are cut off.')
+  })
+
+  it('says how many runs it cannot read', async () => {
+    const slot = renderPage(() => myRuns({ unreadable: 2 }))
+
+    expect((await slot.findByRole('status')).textContent).toBe('2 runs are not shown, because BETTY sent data that bb cannot read.')
   })
 
   it('says when there are no runs', async () => {

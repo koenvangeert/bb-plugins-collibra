@@ -25,6 +25,16 @@ async function caught(promise: Promise<unknown>): Promise<Error> {
 }
 
 describe('PESTO client', () => {
+  it('reads a live run list that is not cut off and has pull requests that are not opened yet', async () => {
+    const pesto = createFakePesto({ tools: { pesto_dag_status: { text: fixture('run-list-live.json') } } })
+    const { client } = connect(pesto)
+
+    const list = await client.listRuns({ ownerDev: 'koen.vangeert@collibra.com', includeFinished: true })
+
+    expect(list.beyondLimit).toBe(0)
+    expect(list.runs.map((run) => run.pullRequests.map((pr) => pr.number))).toEqual([[], [], [26914]])
+  })
+
   it('reads the run list', async () => {
     const pesto = createFakePesto({ tools: fixtureTools })
     const { client } = connect(pesto)
@@ -146,10 +156,21 @@ describe('PESTO client', () => {
     expect(detail.nodes[0]).toMatchObject({ status: 'unknown', executor: 'oracle' })
   })
 
-  it('rejects an answer that misses a required field with a PestoError', async () => {
+  it('skips a run that misses a required field and names it', async () => {
     const list = JSON.parse(fixture('run-list.json'))
-    delete list.runs[0].run_id
+    delete list.runs[0].title
     const pesto = createFakePesto({ tools: { pesto_dag_status: { text: JSON.stringify(list) } } })
+    const { client } = connect(pesto)
+
+    const read = await client.listRuns({ ownerDev: 'a@b.c' })
+
+    expect(read.runs.map((run) => run.runId)).not.toContain(list.runs[0].run_id)
+    expect(read.runs).toHaveLength(list.runs.length - 1)
+    expect(read.unreadable).toEqual([list.runs[0].run_id])
+  })
+
+  it('rejects a run list without runs with a PestoError', async () => {
+    const pesto = createFakePesto({ tools: { pesto_dag_status: { text: JSON.stringify({ runs_matched: 0 }) } } })
     const { client } = connect(pesto)
 
     await expect(client.listRuns({ ownerDev: 'a@b.c' })).rejects.toBeInstanceOf(PestoError)

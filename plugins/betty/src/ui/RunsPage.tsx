@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { experimental_useRpcQuery, useBbNavigate } from '@get-bb/plugin-sdk/app'
 import type { PullRequest, RunSummary } from '../pesto/types'
 import { rpcContract } from '../rpc'
-import { board, OUTCOME_LABEL, PR_STATE_STYLE, type RunGroup } from '../runs/board'
+import { board, OUTCOME_STYLE, PR_STATE_STYLE, type RunGroup } from '../runs/board'
 import { RECENT_DAYS, RUN_LIST_LIMIT } from '../runs/myRuns'
 import { SignInGate } from './SignInGate'
 
@@ -35,7 +35,7 @@ function RunBoard() {
   if (query.error && !query.data) return <p role="alert" className="text-sm text-destructive">{query.error.message}</p>
   if (!query.data) return <p className="text-sm text-muted-foreground">Loading runs.</p>
 
-  const { runs, refreshedAt, cutOff } = query.data
+  const { runs, refreshedAt, cutOff, unreadable } = query.data
   const { groups, spendUsd } = board(runs)
   const tiles = [...groups.map((group) => ({ label: group.label, value: String(group.runs.length) })), { label: 'Spend', value: money(spendUsd) }]
 
@@ -54,6 +54,12 @@ function RunBoard() {
       {cutOff && (
         <p role="status" className="m-0 text-sm text-muted-foreground">
           Showing the newest {RUN_LIST_LIMIT} runs. Older runs are cut off.
+        </p>
+      )}
+      {unreadable > 0 && (
+        <p role="status" className="m-0 text-sm text-muted-foreground">
+          {unreadable === 1 ? '1 run is not shown, because' : `${unreadable} runs are not shown, because`} BETTY sent data
+          that bb cannot read.
         </p>
       )}
       {runs.length === 0 ? (
@@ -83,7 +89,7 @@ function RunRow({ run }: { run: RunSummary }) {
     <li className="flex flex-col gap-1 border-t border-border pt-3 first:border-t-0 first:pt-0">
       <div className="text-sm font-medium">{run.title}</div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        <span>{OUTCOME_LABEL[run.outcome]}</span>
+        <span className={`font-medium ${OUTCOME_STYLE[run.outcome].className}`}>{OUTCOME_STYLE[run.outcome].label}</span>
         <span>
           {run.progress.nodesDone}/{run.progress.nodesTotal} nodes
         </span>

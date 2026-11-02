@@ -66,4 +66,17 @@ describe('my runs', () => {
 
     expect((await result).cutOff).toBe(true)
   })
+
+  it('counts a run it cannot read once, when both lists send it', async () => {
+    const broken = { run_id: 'broken', outcome: 'running' }
+    const { result } = load({
+      recent: list([broken as WireRun, run('a', 'succeeded', '2026-10-30T10:00:00Z')]),
+      active: list([broken as WireRun]),
+    })
+
+    const { runs, unreadable } = await result
+
+    expect(runs.map((entry) => entry.runId)).toEqual(['a'])
+    expect(unreadable).toBe(1)
+  })
 })
