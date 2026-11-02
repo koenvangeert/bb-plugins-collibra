@@ -37,10 +37,6 @@ export const STEP_STATUS_STYLE: Record<NodeStatus, { label: string; className: s
   unknown: { label: 'Unknown', className: 'text-muted-foreground' },
 }
 
-export function stepStatus(node: RunNode): NodeStatus {
-  return node.skipped ? 'skipped' : node.status
-}
-
 export function runCondition(node: RunNode): string {
   const parts = [...(node.when === undefined ? [] : [`Only when ${node.when}`]), ...(node.alwaysRun ? ['Always runs'] : [])]
   if (parts.length > 0) return parts.join(' · ')

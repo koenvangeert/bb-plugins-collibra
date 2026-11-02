@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { fixture } from '../pesto/fakePesto'
 import type { RunNode } from '../pesto/types'
 import { runDetailSchema } from '../pesto/wire'
-import { actionLabel, dagColumns, runCondition, spendCeilings, STEP_STATUS_STYLE, stepStatus } from './detail'
+import { actionLabel, dagColumns, runCondition, spendCeilings, STEP_STATUS_STYLE } from './detail'
 
 const { nodes } = runDetailSchema.parse(JSON.parse(fixture('dag-status.json')))
 const named = (name: string) => nodes.find((node) => node.name === name)!
@@ -15,7 +15,6 @@ function step(name: string, overrides: Partial<RunNode> = {}): RunNode {
     status: 'pending',
     dependsOn: [],
     alwaysRun: false,
-    skipped: false,
     costUsd: 0,
     budgetUsd: null,
     ...overrides,
@@ -55,9 +54,9 @@ describe('run detail', () => {
   })
 
   it('shows a skipped step as skipped even when PESTO calls it succeeded', () => {
-    expect(STEP_STATUS_STYLE[stepStatus(named('remediate-app'))].label).toBe('Skipped')
-    expect(STEP_STATUS_STYLE[stepStatus(named('implement'))].label).toBe('Done')
-    expect(STEP_STATUS_STYLE[stepStatus(step('wait', { status: 'suspended' }))].label).toBe('Needs a decision')
+    expect(STEP_STATUS_STYLE[named('remediate-app').status].label).toBe('Skipped')
+    expect(STEP_STATUS_STYLE[named('implement').status].label).toBe('Done')
+    expect(STEP_STATUS_STYLE[step('wait', { status: 'suspended' }).status].label).toBe('Needs a decision')
   })
 
   it('says when each step runs', () => {

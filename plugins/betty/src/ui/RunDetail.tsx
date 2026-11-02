@@ -2,7 +2,7 @@ import { experimental_useRpcQuery, useBbNavigate } from '@get-bb/plugin-sdk/app'
 import type { PullRequest, RunNode } from '../pesto/types'
 import { rpcContract } from '../rpc'
 import { OUTCOME_STYLE, PR_STATE_STYLE } from '../runs/board'
-import { actionLabel, dagColumns, runCondition, spendCeilings, STEP_STATUS_STYLE, stepStatus } from '../runs/detail'
+import { actionLabel, dagColumns, runCondition, spendCeilings, STEP_STATUS_STYLE } from '../runs/detail'
 import { money, useRefresh } from './shared'
 
 export function RunDetail({ runId }: { runId: string }) {
@@ -106,7 +106,7 @@ function Steps({ nodes }: { nodes: RunNode[] }) {
 }
 
 function StepCard({ node }: { node: RunNode }) {
-  const status = STEP_STATUS_STYLE[stepStatus(node)]
+  const status = STEP_STATUS_STYLE[node.status]
   return (
     <li aria-label={node.name} className="flex flex-col gap-1 rounded-lg border border-border bg-card p-3 text-sm">
       <span className="truncate font-medium" title={node.name}>

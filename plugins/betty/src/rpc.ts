@@ -63,7 +63,6 @@ const runDetail = z.object({
       dependsOn: z.array(z.string()),
       when: z.string().optional(),
       alwaysRun: z.boolean(),
-      skipped: z.boolean(),
       costUsd: z.number(),
       budgetUsd: z.number().nullable(),
       startedAt: z.string().optional(),
