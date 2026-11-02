@@ -50,6 +50,7 @@ export type RunSummary = {
 
 export type RunList = {
   runs: RunSummary[]
+  unreadable: string[]
   beyondLimit: number
   matched: number
 }
@@ -83,3 +84,5 @@ export type Artifact = {
   sizeBytes: number
   content: string
 }
+
+export type Identity = { email: string | null }

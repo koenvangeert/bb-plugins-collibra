@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { PestoError, type McpSession } from './mcp'
-import type { Artifact, RunDetail, RunList } from './types'
-import { artifactSchema, runDetailSchema, runListSchema } from './wire'
+import type { Artifact, Identity, RunDetail, RunList } from './types'
+import { artifactSchema, identitySchema, runDetailSchema, runListSchema } from './wire'
 
 export type ListRunsQuery = {
   ownerDev: string
@@ -42,6 +42,7 @@ export function createPestoClient(session: Pick<McpSession, 'callTool'>) {
         'artifactId' in query ? { artifact_id: query.artifactId } : { task_id: query.taskId, kind: query.kind },
         artifactSchema,
       ),
+    whoami: (): Promise<Identity> => call('pesto_whoami', {}, identitySchema),
   }
 }
 

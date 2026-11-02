@@ -4,19 +4,21 @@ import {
   PULL_REQUEST_STATES,
   RUN_OUTCOMES,
   type Artifact,
+  type Identity,
   type PullRequest,
   type RunDetail,
   type RunList,
   type RunNode,
+  type RunSummary,
 } from './types'
 
 const pullRequest = z
   .object({
-    number: z.number(),
-    url: z.string(),
+    number: z.number().optional(),
+    url: z.string().optional(),
     state: z.enum([...PULL_REQUEST_STATES, 'unknown']).catch('unknown'),
-    base: z.string(),
-    head: z.string(),
+    base: z.string().default(''),
+    head: z.string().default(''),
     repo: z.string(),
     acted_on_by: z
       .array(
@@ -30,8 +32,9 @@ const pullRequest = z
       )
       .default([]),
   })
-  .transform(
-    (pr): PullRequest => ({
+  .transform((pr): PullRequest | null => {
+    if (pr.number === undefined || pr.url === undefined) return null
+    return {
       number: pr.number,
       url: pr.url,
       state: pr.state,
@@ -45,45 +48,59 @@ const pullRequest = z
         ...(action.url === undefined ? {} : { url: action.url }),
         predicted: action.predicted,
       })),
+    }
+  })
+
+const openedPullRequests = z
+  .array(pullRequest)
+  .default([])
+  .transform((prs) => prs.filter((pr): pr is PullRequest => pr !== null))
+
+const runSummary = z
+  .object({
+    run_id: z.string(),
+    title: z.string(),
+    outcome: z.enum([...RUN_OUTCOMES, 'unknown']).catch('unknown'),
+    owner_dev: z.string(),
+    nodes_done: z.number(),
+    nodes_total: z.number(),
+    cost_usd: z.number(),
+    last_status_change_at: z.string(),
+    finished_at: z.string().optional(),
+    pull_requests: openedPullRequests,
+  })
+  .transform(
+    (run): RunSummary => ({
+      runId: run.run_id,
+      title: run.title,
+      outcome: run.outcome,
+      ownerDev: run.owner_dev,
+      progress: { nodesDone: run.nodes_done, nodesTotal: run.nodes_total },
+      costUsd: run.cost_usd,
+      lastStatusChangeAt: run.last_status_change_at,
+      ...(run.finished_at === undefined ? {} : { finishedAt: run.finished_at }),
+      pullRequests: run.pull_requests,
     }),
   )
 
+const runId = z.object({ run_id: z.string() })
+
 export const runListSchema = z
   .object({
-    runs: z.array(
-      z.object({
-        run_id: z.string(),
-        title: z.string(),
-        outcome: z.enum([...RUN_OUTCOMES, 'unknown']).catch('unknown'),
-        owner_dev: z.string(),
-        nodes_done: z.number(),
-        nodes_total: z.number(),
-        cost_usd: z.number(),
-        last_status_change_at: z.string(),
-        finished_at: z.string().optional(),
-        pull_requests: z.array(pullRequest).default([]),
-      }),
-    ),
-    runs_beyond_limit: z.number(),
+    runs: z.array(z.unknown()),
+    runs_beyond_limit: z.number().default(0),
     runs_matched: z.number(),
   })
-  .transform(
-    (list): RunList => ({
-      runs: list.runs.map((run) => ({
-        runId: run.run_id,
-        title: run.title,
-        outcome: run.outcome,
-        ownerDev: run.owner_dev,
-        progress: { nodesDone: run.nodes_done, nodesTotal: run.nodes_total },
-        costUsd: run.cost_usd,
-        lastStatusChangeAt: run.last_status_change_at,
-        ...(run.finished_at === undefined ? {} : { finishedAt: run.finished_at }),
-        pullRequests: run.pull_requests,
-      })),
-      beyondLimit: list.runs_beyond_limit,
-      matched: list.runs_matched,
-    }),
-  )
+  .transform((list): RunList => {
+    const runs: RunSummary[] = []
+    const unreadable: string[] = []
+    for (const row of list.runs) {
+      const run = runSummary.safeParse(row)
+      if (run.success) runs.push(run.data)
+      else unreadable.push(runId.safeParse(row).data?.run_id ?? '')
+    }
+    return { runs, unreadable, beyondLimit: list.runs_beyond_limit, matched: list.runs_matched }
+  })
 
 const node = z
   .object({
@@ -122,7 +139,7 @@ export const runDetailSchema = z
     run_id: z.string(),
     total_cost_usd: z.number(),
     nodes: z.array(node),
-    pull_requests: z.array(pullRequest).default([]),
+    pull_requests: openedPullRequests,
   })
   .transform(
     (run): RunDetail => ({
@@ -150,6 +167,10 @@ export const artifactSchema = z
       content: artifact.content,
     }),
   )
+
+export const identitySchema = z
+  .object({ email: z.string().optional() })
+  .transform((identity): Identity => ({ email: identity.email ?? null }))
 
 function budgetLimit(budget: string | undefined): number | null {
   const limit = budget?.match(/\/\$([\d.]+)/)?.[1]

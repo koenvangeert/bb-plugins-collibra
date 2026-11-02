@@ -2,22 +2,23 @@ import { createFakePluginHost, type FakePluginHost } from '@get-bb/plugin-sdk/te
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createPlugin } from '../server'
 import { createFakeBetty } from './auth/fakeBetty'
+import { createFakePesto, fixture } from './pesto/fakePesto'
 
 type Betty = ReturnType<typeof createFakeBetty>
 
-async function start(betty: Betty) {
+async function start(betty: Betty, fetch = betty.fetch) {
   const host = createFakePluginHost({
     pluginId: 'betty',
     settings: { baseUrl: betty.base },
     sdk: { plugins: { reload: async () => ({ ok: true }) } },
   })
-  await createPlugin({ fetch: betty.fetch })(host.bb)
+  await createPlugin({ fetch })(host.bb)
   return host
 }
 
 const reloadRequests = ({ harness }: FakePluginHost) => harness.inspection.sdk.callsTo('plugins.reload').length
 
-const reload = (host: FakePluginHost, betty: Betty) => host.harness.lifecycle.reload(createPlugin({ fetch: betty.fetch }))
+const reload = (host: FakePluginHost, betty: Betty, fetch = betty.fetch) => host.harness.lifecycle.reload(createPlugin({ fetch }))
 
 const authStatus = ({ harness }: FakePluginHost) => harness.behavior.callRpc('authStatus', null)
 
@@ -27,11 +28,11 @@ async function signIn(host: FakePluginHost, betty: Betty, answer: (params: Recor
   return { url, status: response.status, html: await response.text() }
 }
 
-async function signedIn(betty: Betty) {
-  const host = await start(betty)
+async function signedIn(betty: Betty, fetch = betty.fetch) {
+  const host = await start(betty, fetch)
   await signIn(host, betty)
   await vi.advanceTimersByTimeAsync(0)
-  return reload(host, betty)
+  return reload(host, betty, fetch)
 }
 
 afterEach(() => {
@@ -150,5 +151,47 @@ describe('BETTY sign-in', () => {
     const visible = JSON.stringify(seen)
     for (const token of betty.issued) expect(visible).not.toContain(token)
     expect(host.harness.logEntries.length).toBeGreaterThan(0)
+  })
+})
+
+describe('my runs', () => {
+  function bettyWithPesto(whoami: () => { text: string }) {
+    const betty = createFakeBetty()
+    const pesto = createFakePesto({
+      tools: { pesto_whoami: whoami, pesto_dag_status: { text: fixture('run-list.json') } },
+    })
+    const fetch: typeof globalThis.fetch = (input, init) =>
+      new URL(String(input)).pathname === '/mcp' ? pesto.fetch(input, init) : betty.fetch(input, init)
+    return { betty, pesto, fetch }
+  }
+
+  it('lists the runs of the signed-in user', async () => {
+    vi.useFakeTimers({ now: Date.parse('2026-11-02T12:00:00Z') })
+    const { betty, pesto, fetch } = bettyWithPesto(() => ({ text: fixture('whoami.json') }))
+    const host = await signedIn(betty, fetch)
+
+    const result = (await host.harness.behavior.callRpc('myRuns', null)) as { runs: { runId: string }[]; cutOff: boolean }
+
+    expect(result.runs.map((run) => run.runId)).toEqual(['fft-61-dev-230276-guard-to-categories', 'dev-229618-guardian-kpi-real-data'])
+    expect(result.cutOff).toBe(true)
+    const owners = pesto
+      .toolCalls()
+      .filter((call) => call.body!.params!.name === 'pesto_dag_status')
+      .map((call) => call.body!.params!.arguments!.owner_dev)
+    expect(owners).toEqual(['koen.vangeert@collibra.com', 'koen.vangeert@collibra.com'])
+  })
+
+  it('says why it cannot find runs when BETTY sends no email, and asks again next time', async () => {
+    vi.useFakeTimers()
+    let identity: object = { auth_mode: 'api_key' }
+    const { betty, fetch } = bettyWithPesto(() => ({ text: JSON.stringify(identity) }))
+    const host = await signedIn(betty, fetch)
+
+    await expect(host.harness.behavior.callRpc('myRuns', null)).rejects.toThrow(
+      'BETTY did not tell bb your email, so bb cannot find your runs.',
+    )
+
+    identity = JSON.parse(fixture('whoami.json'))
+    await expect(host.harness.behavior.callRpc('myRuns', null)).resolves.toMatchObject({ cutOff: true })
   })
 })

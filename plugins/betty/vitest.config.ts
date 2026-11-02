@@ -8,7 +8,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    env: { TZ: "Europe/Brussels" },
     server: { deps: { inline: ["@get-bb/plugin-sdk"] } },
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
 });
