@@ -1,0 +1,81 @@
+import { describe, expect, it } from 'vitest'
+import { fixture } from '../pesto/fakePesto'
+import type { RunNode } from '../pesto/types'
+import { runDetailSchema } from '../pesto/wire'
+import { actionLabel, dagColumns, runCondition, spendCeilings, STEP_STATUS_STYLE, stepStatus } from './detail'
+
+const { nodes } = runDetailSchema.parse(JSON.parse(fixture('dag-status.json')))
+const named = (name: string) => nodes.find((node) => node.name === name)!
+
+function step(name: string, overrides: Partial<RunNode> = {}): RunNode {
+  return {
+    taskId: name,
+    name,
+    executor: 'agent',
+    status: 'pending',
+    dependsOn: [],
+    alwaysRun: false,
+    skipped: false,
+    costUsd: 0,
+    budgetUsd: null,
+    ...overrides,
+  }
+}
+
+describe('run detail', () => {
+  it('puts each step in the column of its longest path from a first step', () => {
+    const columns = dagColumns(nodes).map((column) => column.map((node) => node.name))
+
+    expect(columns).toEqual([
+      ['implement', 'provision-env'],
+      ['review'],
+      ['remediate-review'],
+      ['review-2'],
+      ['publish-review', 'remediate-review-2'],
+      ['build-frontend'],
+      ['validate-app'],
+      ['remediate-app'],
+      ['build-after-fix'],
+      ['revalidate-app'],
+      ['lap-settled', 'reconcile-ci'],
+      ['teardown-env'],
+    ])
+  })
+
+  it('ignores a dependency that names no step', () => {
+    const columns = dagColumns([step('b', { dependsOn: ['a', 'gone'] }), step('a')])
+
+    expect(columns.map((column) => column.map((node) => node.name))).toEqual([['a'], ['b']])
+  })
+
+  it('stops on a cycle and still places every step', () => {
+    const columns = dagColumns([step('a', { dependsOn: ['b'] }), step('b', { dependsOn: ['a'] })])
+
+    expect(columns.flat().map((node) => node.name).sort()).toEqual(['a', 'b'])
+  })
+
+  it('shows a skipped step as skipped even when PESTO calls it succeeded', () => {
+    expect(STEP_STATUS_STYLE[stepStatus(named('remediate-app'))].label).toBe('Skipped')
+    expect(STEP_STATUS_STYLE[stepStatus(named('implement'))].label).toBe('Done')
+    expect(STEP_STATUS_STYLE[stepStatus(step('wait', { status: 'suspended' }))].label).toBe('Needs a decision')
+  })
+
+  it('says when each step runs', () => {
+    expect(runCondition(named('remediate-app'))).toBe('Only when $validate-app.output.all_met == false')
+    expect(runCondition(named('teardown-env'))).toBe('Always runs')
+    expect(runCondition(named('implement'))).toBe('Runs first')
+    expect(runCondition(named('remediate-review'))).toBe('After implement, review')
+    expect(runCondition(step('x', { when: 'ok', alwaysRun: true, dependsOn: ['a'] }))).toBe('Only when ok · Always runs')
+  })
+
+  it('caps a clean run without the conditional steps and the worst case with all of them', () => {
+    expect(spendCeilings(nodes)).toEqual({ cleanRunUsd: 93, worstCaseUsd: 105 })
+  })
+
+  it('names what each step did on the pull request', () => {
+    expect(actionLabel('post_review')).toBe('Review')
+    expect(actionLabel('remediation_comment')).toBe('Remediation')
+    expect(actionLabel('ci_watch')).toBe('CI watch')
+    expect(actionLabel('merge_gate_check')).toBe('merge gate check')
+  })
+})
