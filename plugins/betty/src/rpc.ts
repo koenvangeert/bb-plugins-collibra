@@ -29,9 +29,32 @@ const runSummary = z.object({
 }) satisfies z.ZodType<RunSummary>
 
 const myRuns = z.object({ refreshedAt: z.number(), runs: z.array(runSummary), cutOff: z.boolean(), unreadable: z.number() }) satisfies z.ZodType<MyRuns>
+import { RUN_STATUSES, type ThreadRun } from './runChip'
+
+const threadInput = z.object({ threadId: z.string().min(1) })
+
+const runChipSchema = z.object({
+  status: z.enum(RUN_STATUSES),
+  nodesDone: z.number(),
+  nodesTotal: z.number(),
+  costUsd: z.number(),
+})
+
+const threadRunSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none'), ticketKey: z.string().nullable() }),
+  z.object({
+    kind: z.literal('linked'),
+    runId: z.string(),
+    chip: runChipSchema.nullable(),
+    pullRequests: z.array(z.object({ number: z.number(), url: z.string(), state: z.enum([...PULL_REQUEST_STATES, 'unknown']), repo: z.string() })),
+    error: z.string().nullable(),
+  }),
+]) satisfies z.ZodType<ThreadRun>
 
 export const rpcContract = defineRpcContract({
   authStatus: { input: z.null(), output: z.object({ state: z.enum(AUTH_KINDS) }) },
   startSignIn: { input: z.null(), output: z.object({ url: z.url({ protocol: /^https$/ }) }) },
   myRuns: { input: z.null(), output: myRuns },
+  threadRun: { input: threadInput, output: threadRunSchema },
+  startRun: { input: threadInput, output: z.null() },
 })

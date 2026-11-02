@@ -292,7 +292,7 @@ function RunRow({ run, now }: { run: RunSummary; now: number }) {
   )
 }
 
-function PullRequestChip({ pr }: { pr: PullRequest }) {
+export function PullRequestChip({ pr }: { pr: Pick<PullRequest, 'number' | 'url' | 'state' | 'repo'> }) {
   const navigate = useBbNavigate()
   const style = PR_STATE_STYLE[pr.state]
   return (
