@@ -3,7 +3,8 @@ import type { PullRequest, RunNode } from '../pesto/types'
 import { rpcContract } from '../rpc'
 import { OUTCOME_STYLE, PR_STATE_STYLE } from '../runs/board'
 import { actionLabel, baseMayMislead, dagColumns, runCondition, spendCeilings, STEP_STATUS_STYLE } from '../runs/detail'
-import { money, useRefresh } from './shared'
+import { money } from './format'
+import { useRefresh } from './refresh'
 
 export function RunDetail({ runId }: { runId: string }) {
   const query = experimental_useRpcQuery({ contract: rpcContract, method: 'runDetail', input: { runId } })

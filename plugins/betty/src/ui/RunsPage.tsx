@@ -16,7 +16,8 @@ import {
 } from '../runs/board'
 import { RECENT_DAYS, RUN_LIST_LIMIT } from '../runs/myRuns'
 import { RunDetail } from './RunDetail'
-import { money, useRefresh } from './shared'
+import { money } from './format'
+import { useRefresh } from './refresh'
 import { SignInGate } from './SignInGate'
 
 const FINISHED_SHOWN = 8
