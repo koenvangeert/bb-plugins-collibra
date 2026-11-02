@@ -20,16 +20,16 @@ export const RUN_GROUPS: readonly { id: RunGroupId; label: string }[] = [
   { id: 'finished', label: 'Finished' },
 ]
 
-export const OUTCOME_LABEL: Record<RunOutcome, string> = {
-  needs_decision: 'Needs a decision',
-  running: 'Running',
-  watching_ci: 'Watching CI',
-  waiting: 'Waiting',
-  unknown: 'Unknown',
-  succeeded: 'Succeeded',
-  partially_succeeded: 'Partly succeeded',
-  failed: 'Failed',
-  cancelled: 'Cancelled',
+export const OUTCOME_STYLE: Record<RunOutcome, { label: string; className: string }> = {
+  needs_decision: { label: 'Needs a decision', className: 'text-amber-600' },
+  running: { label: 'Running', className: 'text-blue-600' },
+  watching_ci: { label: 'Watching CI', className: 'text-violet-600' },
+  waiting: { label: 'Waiting', className: 'text-slate-500' },
+  unknown: { label: 'Unknown', className: 'text-muted-foreground' },
+  succeeded: { label: 'Succeeded', className: 'text-green-600' },
+  partially_succeeded: { label: 'Partly succeeded', className: 'text-orange-600' },
+  failed: { label: 'Failed', className: 'text-red-600' },
+  cancelled: { label: 'Cancelled', className: 'text-gray-500' },
 }
 
 export const PR_STATE_STYLE: Record<PullRequestState, { label: string; className: string }> = {
