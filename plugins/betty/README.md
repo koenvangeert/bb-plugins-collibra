@@ -19,9 +19,19 @@ Change it with `bb plugin config betty set baseUrl https://...`.
 - Tokens stay in the plugin database on the bb server. They never go to the app or the log.
 - A changed `baseUrl` needs a new sign-in.
 
+## Runs page
+
+- The "BETTY" page in the left rail lists your runs. "Your" means runs whose `owner_dev` is the email that `pesto_whoami` gives for your sign-in.
+- It shows runs from the last 14 days and every run that is still active.
+- Groups: "Needs a decision", "In flight", "Finished". Tiles show the count of each group and the total spend.
+- Each row shows its pull requests as chips with the number and state. Click a chip to open the pull request.
+- The page reads the list again every 30 seconds and shows the time of the last read.
+- Each PESTO query asks for 100 runs at most. When PESTO has more, the page says that older runs are cut off.
+- When BETTY sends no email (an `api_key` connection), the page shows an error.
+
 ## Status
 
-- The PESTO client reads the run list, one run's nodes, and artifacts.
+- The PESTO client reads your identity, the run list, one run's nodes, and artifacts.
 - The "BETTY run" tab shows the sign-in button, or a placeholder when you are signed in.
 
 ## Develop
