@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { fixture } from '../pesto/fakePesto'
 import type { RunNode } from '../pesto/types'
 import { runDetailSchema } from '../pesto/wire'
-import { actionLabel, dagColumns, runCondition, spendCeilings, STEP_STATUS_STYLE } from './detail'
+import { actionLabel, baseMayMislead, dagColumns, runCondition, spendCeilings, STEP_STATUS_STYLE } from './detail'
 
-const { nodes } = runDetailSchema.parse(JSON.parse(fixture('dag-status.json')))
+const { nodes, pullRequests } = runDetailSchema.parse(JSON.parse(fixture('dag-status.json')))
 const named = (name: string) => nodes.find((node) => node.name === name)!
 
 function step(name: string, overrides: Partial<RunNode> = {}): RunNode {
@@ -81,6 +81,14 @@ describe('run detail', () => {
     ]
 
     expect(spendCeilings(pending)).toEqual({ cleanRunUsd: 6, worstCaseUsd: 19 })
+  })
+
+  it.each([
+    ['main', false],
+    ['', false],
+    ['release/1', true],
+  ])('warns about a pull request on base %j: %s', (base, warns) => {
+    expect(baseMayMislead({ ...pullRequests[0]!, base })).toBe(warns)
   })
 
   it('names what each step did on the pull request', () => {

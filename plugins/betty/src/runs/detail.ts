@@ -1,4 +1,4 @@
-import type { NodeStatus, RunNode } from '../pesto/types'
+import type { NodeStatus, PullRequest, RunNode } from '../pesto/types'
 
 export function dagColumns(nodes: readonly RunNode[]): RunNode[][] {
   const byName = new Map(nodes.map((node) => [node.name, node]))
@@ -81,4 +81,8 @@ const ACTION_LABEL = new Map([
 
 export function actionLabel(kind: string): string {
   return ACTION_LABEL.get(kind) ?? kind.replaceAll('_', ' ')
+}
+
+export function baseMayMislead(pr: PullRequest): boolean {
+  return pr.base !== '' && pr.base !== 'main'
 }

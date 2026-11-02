@@ -2,7 +2,7 @@ import { experimental_useRpcQuery, useBbNavigate } from '@get-bb/plugin-sdk/app'
 import type { PullRequest, RunNode } from '../pesto/types'
 import { rpcContract } from '../rpc'
 import { OUTCOME_STYLE, PR_STATE_STYLE } from '../runs/board'
-import { actionLabel, dagColumns, runCondition, spendCeilings, STEP_STATUS_STYLE } from '../runs/detail'
+import { actionLabel, baseMayMislead, dagColumns, runCondition, spendCeilings, STEP_STATUS_STYLE } from '../runs/detail'
 import { money, useRefresh } from './shared'
 
 export function RunDetail({ runId }: { runId: string }) {
@@ -62,7 +62,7 @@ function PullRequestSection({ pr }: { pr: PullRequest }) {
           {pr.head} → {pr.base}
         </span>
       </div>
-      {pr.base !== '' && pr.base !== 'main' && (
+      {baseMayMislead(pr) && (
         <p role="status" className="m-0 rounded-md border border-amber-500 px-3 py-2 text-sm text-amber-600">
           Base is {pr.base}, not main. CI may run only a few checks, so a green CI can mislead.
         </p>
