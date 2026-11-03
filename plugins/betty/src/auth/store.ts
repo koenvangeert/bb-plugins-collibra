@@ -13,6 +13,11 @@ export const MIGRATIONS = [
     id INTEGER PRIMARY KEY CHECK (id = 1),
     state TEXT NOT NULL
   )`,
+  `CREATE TABLE watched_runs (
+    run_id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL,
+    status TEXT NOT NULL
+  )`,
 ]
 
 const tokens = z.object({ accessToken: z.string(), refreshToken: z.string().nullable(), expiresAt: z.number() })

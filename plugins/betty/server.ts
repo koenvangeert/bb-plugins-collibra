@@ -8,6 +8,7 @@ import { createMcpSession, PestoError } from './src/pesto/mcp'
 import { rpcContract } from './src/rpc'
 import { loadMyRuns } from './src/runs/myRuns'
 import { chipLabel } from './src/runChip'
+import { createRunWatcher } from './src/runWatcher'
 import { mcpEndpoint, SETTINGS } from './src/settings'
 import { createThreadRuns, LINK_TOOL } from './src/threadRun'
 
@@ -54,7 +55,15 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
       return ownerEmail
     }
 
-    const runs = createThreadRuns({ sdk: bb.sdk, pesto })
+    const watcher = createRunWatcher({
+      db,
+      pesto,
+      sdk: bb.sdk.threads,
+      isSignedIn: () => auth.state().kind === 'signed-in',
+      log: (line) => bb.log.warn(line),
+    })
+    bb.background.service('run-watcher', { start: (signal) => watcher.run(signal) })
+    const runs = createThreadRuns({ sdk: bb.sdk, pesto, watch: watcher.watch })
 
     bb.agents.registerTool({
       name: LINK_TOOL,
