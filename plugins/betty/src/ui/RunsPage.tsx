@@ -312,7 +312,7 @@ function RunRow({ run, now }: { run: RunSummary; now: number }) {
   )
 }
 
-export function PullRequestChip({ pr }: { pr: Pick<PullRequest, 'number' | 'url' | 'state' | 'repo'> }) {
+function PullRequestChip({ pr }: { pr: Pick<PullRequest, 'number' | 'url' | 'state' | 'repo'> }) {
   const navigate = useBbNavigate()
   const style = PR_STATE_STYLE[pr.state]
   return (

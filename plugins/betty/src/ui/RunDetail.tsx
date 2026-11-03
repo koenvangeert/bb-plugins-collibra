@@ -6,7 +6,7 @@ import { actionLabel, baseMayMislead, dagColumns, runCondition, spendCeilings, S
 import { money } from './format'
 import { useRefresh } from './refresh'
 
-export function RunDetail({ runId }: { runId: string }) {
+export function RunDetail({ runId, compact = false }: { runId: string; compact?: boolean }) {
   const query = experimental_useRpcQuery({ contract: rpcContract, method: 'runDetail', input: { runId } })
   const list = experimental_useRpcQuery({ contract: rpcContract, method: 'myRuns', input: null })
   const summary = list.data?.runs.find((run) => run.runId === runId)
@@ -24,7 +24,7 @@ export function RunDetail({ runId }: { runId: string }) {
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
         <div className="flex flex-wrap items-baseline gap-x-3">
-          <h2 className="m-0 text-lg font-semibold">{summary?.title ?? runId}</h2>
+          <h2 className={`m-0 font-semibold ${compact ? 'text-base' : 'text-lg'}`}>{summary?.title ?? runId}</h2>
           {outcome && <span className={`text-sm font-medium ${outcome.text}`}>{outcome.label}</span>}
         </div>
         <span className="font-mono text-xs text-muted-foreground">{runId}</span>
@@ -39,7 +39,7 @@ export function RunDetail({ runId }: { runId: string }) {
       {pullRequests.map((pr) => (
         <PullRequestSection key={pr.url} pr={pr} />
       ))}
-      <Steps nodes={nodes} />
+      <Steps nodes={nodes} compact={compact} />
     </div>
   )
 }
@@ -92,11 +92,11 @@ function PullRequestSection({ pr }: { pr: PullRequest }) {
   )
 }
 
-function Steps({ nodes }: { nodes: RunNode[] }) {
+function Steps({ nodes, compact }: { nodes: RunNode[]; compact: boolean }) {
   return (
-    <section aria-label="Steps" className="flex gap-3 overflow-x-auto pb-2">
+    <section aria-label="Steps" className={compact ? 'flex flex-col gap-2' : 'flex gap-3 overflow-x-auto pb-2'}>
       {dagColumns(nodes).map((column, index) => (
-        <ul key={index} className="m-0 flex w-56 shrink-0 list-none flex-col gap-2 p-0">
+        <ul key={index} className={`m-0 flex list-none flex-col gap-2 p-0 ${compact ? '' : 'w-56 shrink-0'}`}>
           {column.map((node) => (
             <StepCard key={node.taskId} node={node} />
           ))}

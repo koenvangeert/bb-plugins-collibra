@@ -1,3 +1,4 @@
+import type { ThreadRun } from '../runChip'
 // @vitest-environment jsdom
 import { cleanup, within } from '@testing-library/react'
 import { act, type ComponentType } from 'react'
@@ -341,4 +342,31 @@ describe('BETTY run tab', () => {
 
     expect(await slot.findByRole('button', { name: 'Sign in to BETTY' })).toBeTruthy()
   })
+
+  it('shows the run detail of the linked run', async () => {
+    const slot = renderThreadTab({ kind: 'linked', runId: 'Rename the column', chip: null, pullRequests: [], error: null })
+
+    expect(await slot.findByRole('heading', { name: 'Rename the column' })).toBeTruthy()
+    expect(slot.getByText(/CI may run only a few checks/)).toBeTruthy()
+    expect(slot.getByText(/^Clean run/).textContent).toBe('Clean run up to $78.00 · Worst case up to $105.00 (one attempt per step)')
+    expect(slot.getByRole('listitem', { name: 'remediate-review' }).textContent).toContain('$0.56/$12.00')
+  })
+
+  it('says when the thread has no run', async () => {
+    const slot = renderThreadTab({ kind: 'none', ticketKey: null })
+
+    expect(await slot.findByText('No BETTY run for this thread yet.')).toBeTruthy()
+  })
 })
+
+function renderThreadTab(threadRun: ThreadRun) {
+  return renderSlot({ component: app.tabs[0]!.component as ComponentType<{ threadId: string }> }, { threadId: 'thr_1' }, {
+    rpc: {
+      authStatus: () => ({ state: 'signed-in' }),
+      startSignIn: () => ({ url: 'https://betty.test/oauth/authorize' }),
+      myRuns: () => myRuns(),
+      threadRun: () => threadRun,
+      runDetail: () => detailWithBase('release/1'),
+    },
+  })
+}

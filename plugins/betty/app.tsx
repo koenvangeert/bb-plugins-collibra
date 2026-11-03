@@ -9,9 +9,10 @@ import {
   type PluginThreadHeaderActionProps,
 } from '@get-bb/plugin-sdk/app'
 import { rpcContract } from './src/rpc'
-import { chipLabel, chipProgress, type ThreadRun } from './src/runChip'
+import { chipLabel, chipProgress } from './src/runChip'
 import { OUTCOME_STYLE } from './src/runs/board'
-import { PullRequestChip, RunsPage } from './src/ui/RunsPage'
+import { RunDetail } from './src/ui/RunDetail'
+import { RunsPage } from './src/ui/RunsPage'
 import { SignInGate } from './src/ui/SignInGate'
 
 const RUN_TAB = 'betty-run'
@@ -68,27 +69,9 @@ function ThreadRunPanel({ threadId }: ExperimentalThreadActionTabProps) {
   const { data: run } = useThreadRun(threadId)
   return (
     <SignInGate>
-      <div className="flex flex-col items-start gap-2">{run && <RunDetails run={run} />}</div>
+      {run?.kind === 'none' && <p className="text-sm text-muted-foreground">No BETTY run for this thread yet.</p>}
+      {run?.kind === 'linked' && <RunDetail runId={run.runId} compact />}
     </SignInGate>
-  )
-}
-
-function RunDetails({ run }: { run: ThreadRun }) {
-  if (run.kind === 'none') return <p className="text-sm text-muted-foreground">No BETTY run for this thread yet.</p>
-
-  return (
-    <>
-      <p className="font-mono text-xs text-muted-foreground">{run.runId}</p>
-      <p className="text-sm">{chipLabel(run.chip)}</p>
-      {run.error && <p className="text-sm text-destructive">{run.error}</p>}
-      {run.pullRequests.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {run.pullRequests.map((pr) => (
-            <PullRequestChip key={pr.url} pr={pr} />
-          ))}
-        </div>
-      )}
-    </>
   )
 }
 
