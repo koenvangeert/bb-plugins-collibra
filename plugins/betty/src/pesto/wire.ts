@@ -87,9 +87,9 @@ const runId = z.object({ run_id: z.string() })
 
 export const runListSchema = z
   .object({
-    runs: z.array(z.unknown()),
+    runs: z.array(z.unknown()).default([]),
     runs_beyond_limit: z.number().default(0),
-    runs_matched: z.number(),
+    runs_matched: z.number().default(0),
   })
   .transform((list): RunList => {
     const runs: RunSummary[] = []
@@ -122,11 +122,10 @@ const node = z
       taskId: node.task_id,
       name: node.name,
       executor: node.executor,
-      status: node.status,
+      status: node.skipped ? 'skipped' : node.status,
       dependsOn: node.depends_on,
       ...(node.when === undefined ? {} : { when: node.when }),
       alwaysRun: node.always_run,
-      skipped: node.skipped,
       costUsd: node.cost_usd,
       budgetUsd: budgetLimit(node.budget),
       ...(node.started_at === undefined ? {} : { startedAt: node.started_at }),

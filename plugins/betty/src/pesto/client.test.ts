@@ -91,7 +91,7 @@ describe('PESTO client', () => {
       dependsOn: [],
       startedAt: '2026-10-28T15:11:39Z',
     })
-    expect(node('remediate-app')).toMatchObject({ when: '$validate-app.output.all_met == false', skipped: true, costUsd: 0 })
+    expect(node('remediate-app')).toMatchObject({ when: '$validate-app.output.all_met == false', status: 'skipped', costUsd: 0 })
     expect(node('teardown-env')).toMatchObject({ alwaysRun: true, executor: 'script', budgetUsd: null })
     expect(node('publish-review')!.executor).toBe('publisher')
   })
@@ -141,8 +141,8 @@ describe('PESTO client', () => {
     list.runs[0].outcome = 'hibernating'
     list.runs[0].pull_requests[0].state = 'queued'
     const run = JSON.parse(fixture('dag-status.json'))
-    run.nodes[0].status = 'teleporting'
-    run.nodes[0].executor = 'oracle'
+    run.nodes[1].status = 'teleporting'
+    run.nodes[1].executor = 'oracle'
     const pesto = createFakePesto({
       tools: { pesto_dag_status: (args) => ({ text: JSON.stringify(args.run_id ? run : list) }) },
     })
@@ -153,7 +153,7 @@ describe('PESTO client', () => {
 
     expect(runs.runs[0]!.outcome).toBe('unknown')
     expect(runs.runs[0]!.pullRequests[0]!.state).toBe('unknown')
-    expect(detail.nodes[0]).toMatchObject({ status: 'unknown', executor: 'oracle' })
+    expect(detail.nodes[1]).toMatchObject({ status: 'unknown', executor: 'oracle' })
   })
 
   it('skips a run that misses a required field and names it', async () => {
@@ -169,8 +169,15 @@ describe('PESTO client', () => {
     expect(read.unreadable).toEqual([list.runs[0].run_id])
   })
 
-  it('rejects a run list without runs with a PestoError', async () => {
-    const pesto = createFakePesto({ tools: { pesto_dag_status: { text: JSON.stringify({ runs_matched: 0 }) } } })
+  it('reads the live answer for no active runs as an empty list', async () => {
+    const pesto = createFakePesto({ tools: { pesto_dag_status: { text: fixture('run-list-none-active.json') } } })
+    const { client } = connect(pesto)
+
+    expect(await client.listRuns({ ownerDev: 'a@b.c' })).toEqual({ runs: [], unreadable: [], beyondLimit: 0, matched: 0 })
+  })
+
+  it('rejects a run list whose runs are not a list with a PestoError', async () => {
+    const pesto = createFakePesto({ tools: { pesto_dag_status: { text: JSON.stringify({ runs: 'none', runs_matched: 0 }) } } })
     const { client } = connect(pesto)
 
     await expect(client.listRuns({ ownerDev: 'a@b.c' })).rejects.toBeInstanceOf(PestoError)

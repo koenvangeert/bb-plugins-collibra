@@ -20,16 +20,16 @@ export const RUN_GROUPS: readonly { id: RunGroupId; label: string }[] = [
   { id: 'finished', label: 'Finished' },
 ]
 
-export const OUTCOME_STYLE: Record<RunOutcome, { label: string; text: string; fill: string }> = {
-  needs_decision: { label: 'Needs a decision', text: 'text-amber-600', fill: 'bg-amber-500' },
-  running: { label: 'Running', text: 'text-blue-600', fill: 'bg-blue-500' },
-  watching_ci: { label: 'Watching CI', text: 'text-violet-600', fill: 'bg-violet-500' },
-  waiting: { label: 'Waiting', text: 'text-slate-500', fill: 'bg-slate-400' },
-  unknown: { label: 'Unknown', text: 'text-muted-foreground', fill: 'bg-gray-300' },
-  succeeded: { label: 'Succeeded', text: 'text-green-600', fill: 'bg-green-500' },
-  partially_succeeded: { label: 'Partly succeeded', text: 'text-orange-600', fill: 'bg-orange-500' },
-  failed: { label: 'Failed', text: 'text-red-600', fill: 'bg-red-500' },
-  cancelled: { label: 'Cancelled', text: 'text-gray-500', fill: 'bg-gray-400' },
+export const OUTCOME_STYLE: Record<RunOutcome, { label: string; text: string; fill: string; pill: string; icon: string }> = {
+  needs_decision: { label: 'Needs a decision', text: 'text-amber-600', fill: 'bg-amber-500', pill: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', icon: 'Pause' },
+  running: { label: 'Running', text: 'text-blue-600', fill: 'bg-blue-500', pill: 'bg-blue-500/10 text-blue-700 dark:text-blue-400', icon: 'Loading' },
+  watching_ci: { label: 'Watching CI', text: 'text-violet-600', fill: 'bg-violet-500', pill: 'bg-violet-500/10 text-violet-700 dark:text-violet-400', icon: 'Eye' },
+  waiting: { label: 'Waiting', text: 'text-slate-500', fill: 'bg-slate-400', pill: 'bg-slate-500/10 text-slate-600 dark:text-slate-400', icon: 'Clock' },
+  unknown: { label: 'Unknown', text: 'text-muted-foreground', fill: 'bg-gray-300', pill: 'bg-muted text-muted-foreground', icon: 'CircleQuestion' },
+  succeeded: { label: 'Succeeded', text: 'text-green-600', fill: 'bg-green-500', pill: 'bg-green-500/10 text-green-700 dark:text-green-400', icon: 'CircleCheck' },
+  partially_succeeded: { label: 'Partly succeeded', text: 'text-orange-600', fill: 'bg-orange-500', pill: 'bg-orange-500/10 text-orange-700 dark:text-orange-400', icon: 'AlertTriangle' },
+  failed: { label: 'Failed', text: 'text-red-600', fill: 'bg-red-500', pill: 'bg-red-500/10 text-red-700 dark:text-red-400', icon: 'CircleX' },
+  cancelled: { label: 'Cancelled', text: 'text-gray-500', fill: 'bg-gray-400', pill: 'bg-gray-500/10 text-gray-600 dark:text-gray-400', icon: 'Unavailable' },
 }
 
 export const OUTCOME_ORDER: readonly RunOutcome[] = [
@@ -44,12 +44,12 @@ export const OUTCOME_ORDER: readonly RunOutcome[] = [
   'cancelled',
 ]
 
-export const PR_STATE_STYLE: Record<PullRequestState, { label: string; className: string }> = {
-  open: { label: 'open', className: 'border-green-600 text-green-600' },
-  draft: { label: 'draft', className: 'border-gray-500 text-gray-500' },
-  merged: { label: 'merged', className: 'border-purple-600 text-purple-600' },
-  closed: { label: 'closed', className: 'border-red-600 text-red-600' },
-  unknown: { label: 'unknown', className: 'border-border text-muted-foreground' },
+export const PR_STATE_STYLE: Record<PullRequestState, { label: string; className: string; text: string; pill: string; icon: string }> = {
+  open: { label: 'open', className: 'border-green-600 text-green-600', text: 'text-green-600 dark:text-green-400', pill: 'bg-green-500/10 text-green-700 dark:text-green-400', icon: 'GitPullRequest' },
+  draft: { label: 'draft', className: 'border-gray-500 text-gray-500', text: 'text-gray-500 dark:text-gray-400', pill: 'bg-gray-500/10 text-gray-600 dark:text-gray-400', icon: 'GitPullRequestDraft' },
+  merged: { label: 'merged', className: 'border-purple-600 text-purple-600', text: 'text-purple-600 dark:text-purple-400', pill: 'bg-purple-500/10 text-purple-700 dark:text-purple-400', icon: 'GitMerge' },
+  closed: { label: 'closed', className: 'border-red-600 text-red-600', text: 'text-red-600 dark:text-red-400', pill: 'bg-red-500/10 text-red-700 dark:text-red-400', icon: 'GitPullRequestClosed' },
+  unknown: { label: 'unknown', className: 'border-border text-muted-foreground', text: 'text-muted-foreground', pill: 'bg-muted text-muted-foreground', icon: 'GitPullRequest' },
 }
 
 export type TileId = 'needs-decision' | 'in-flight' | 'shipped' | 'broke'

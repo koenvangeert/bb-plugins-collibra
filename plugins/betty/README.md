@@ -42,10 +42,23 @@ Change it with `bb plugin config betty set baseUrl https://...`.
 - "Run with BETTY" sends a prompt to the agent of the same thread. The agent starts the run with the pesto MCP, then calls `betty_link_run`.
 - The `betty_link_run` agent tool takes `{ runId }`. It checks the run exists, then writes the link for the calling thread. It never starts a new thread.
 
+## Run detail
+
+- Click a run title to open its detail. "Back to runs" goes back to the list.
+- The header shows the title, the outcome, the run id, and what the run spent.
+- "Clean run up to" adds the budgets of the steps that run when no condition fires. It leaves out the conditional fix-up steps (with a `when`) and the steps that wait on them, because PESTO skips those too. A step that waits on a fix-up step counts again when it already ran after that fix-up step was skipped, and an `always_run` step always counts. "Worst case up to" adds the budgets of all steps. Both count one attempt per step, so a retried step can spend more.
+- A pending run can show a clean run that is too low: a pending step that waits on a fix-up step counts as skipped until it runs.
+- Each pull request has an "Open PR" button, its repo, and `head → base`.
+- When the base is not `main`, the detail warns: CI may run only a few checks, so a green CI can mislead.
+- Below each pull request is the list of steps that acted on it (review, remediation, CI watch). Click an entry to open its review or comment on GitHub. An entry that has not happened yet shows "planned".
+- The steps show in columns. A step's column is its longest path from a first step. Each step shows its status, its spend against its budget (or its executor when it has no budget), and when it runs.
+- The detail reads the run and its outcome again every 30 seconds.
+
 ## Status
 
 - The PESTO client reads your identity, the run list, one run's nodes, and artifacts.
 - The "BETTY run" tab shows the run id, status, steps, spend and pull requests of the linked run.
+- The runs page and the run detail are done.
 
 ## Develop
 

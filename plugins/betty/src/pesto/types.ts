@@ -63,7 +63,6 @@ export type RunNode = {
   dependsOn: string[]
   when?: string
   alwaysRun: boolean
-  skipped: boolean
   costUsd: number
   budgetUsd: number | null
   startedAt?: string

@@ -88,6 +88,7 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
         await runs.startRun(threadId)
         return null
       },
+      runDetail: ({ runId }) => pesto.dagStatus(runId),
     })
 
     bb.http.route(
