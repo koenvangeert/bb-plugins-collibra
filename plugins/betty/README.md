@@ -32,10 +32,20 @@ Change it with `bb plugin config betty set baseUrl https://...`.
 - Each PESTO query asks for 100 runs at most. When PESTO has more, the page says that older runs are cut off.
 - When BETTY sends no email (an `api_key` connection), the page shows an error.
 
+## Thread link
+
+- A thread links to one BETTY run. The link is `{ runId }` in the thread's `betty` plugin metadata, so it stays after a bb restart.
+- Status, steps and spend come live from `pesto_dag_status`. The plugin stores nothing else.
+- The thread header shows the BETTY icon, a dot in the status colour, and the steps and spend, for example `6/14 · $4.10`. Hover shows the full label, `BETTY · Running · 6/14 · $4.10`. A click opens the "BETTY run" tab. The header reads the run again every 30 seconds.
+- When BETTY cannot be read, the header shows `BETTY · unknown` and the tab shows the error or the sign-in button.
+- A thread with no run shows "Run with BETTY". The ticket key comes from the `jira` plugin metadata (`issueKey`).
+- "Run with BETTY" sends a prompt to the agent of the same thread. The agent starts the run with the pesto MCP, then calls `betty_link_run`.
+- The `betty_link_run` agent tool takes `{ runId }`. It checks the run exists, then writes the link for the calling thread. It never starts a new thread.
+
 ## Status
 
 - The PESTO client reads your identity, the run list, one run's nodes, and artifacts.
-- The "BETTY run" tab shows the sign-in button, or a placeholder when you are signed in.
+- The "BETTY run" tab shows the run id, status, steps, spend and pull requests of the linked run.
 
 ## Develop
 

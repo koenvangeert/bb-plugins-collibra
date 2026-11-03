@@ -1,4 +1,5 @@
 import type { BbPluginApi } from '@get-bb/plugin-sdk'
+import { z } from 'zod'
 import { createBettyAuth } from './src/auth/session'
 import { SIGN_IN_PROMPT } from './src/auth/state'
 import { createAuthStore, MIGRATIONS } from './src/auth/store'
@@ -6,7 +7,9 @@ import { createPestoClient } from './src/pesto/client'
 import { createMcpSession, PestoError } from './src/pesto/mcp'
 import { rpcContract } from './src/rpc'
 import { loadMyRuns } from './src/runs/myRuns'
+import { chipLabel } from './src/runChip'
 import { mcpEndpoint, SETTINGS } from './src/settings'
+import { createThreadRuns, LINK_TOOL } from './src/threadRun'
 
 const CALLBACK_PATH = '/oauth/callback'
 
@@ -51,6 +54,25 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
       return ownerEmail
     }
 
+    const runs = createThreadRuns({ sdk: bb.sdk, pesto })
+
+    bb.agents.registerTool({
+      name: LINK_TOOL,
+      description: 'Link a submitted BETTY (PESTO) run to this thread. The thread header then shows the run status, steps and spend.',
+      parameters: z.object({ runId: z.string().trim().min(1).describe('The run_id that pesto_dag_submit returned.') }),
+      presentation: { label: { pending: 'Linking BETTY run', completed: 'Linked BETTY run' }, icon: { glyph: 'Workflow' } },
+      execute: async ({ runId }, ctx) => {
+        try {
+          const chip = await runs.link(ctx.threadId, runId)
+          bb.rpc.experimental_invalidateAll()
+          return `Linked BETTY run ${runId} to this thread. ${chipLabel(chip)}`
+        } catch (error) {
+          return { content: [{ type: 'text', text: `Could not link BETTY run ${runId}: ${message(error)}` }], isError: true }
+        }
+      },
+    })
+    bb.agents.configure(() => ({ tools: [LINK_TOOL], skills: [] }))
+
     settings.onChange((next) => {
       if (next.baseUrl !== baseUrl) reload()
     })
@@ -61,6 +83,11 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
         url: await auth.startSignIn(`${bb.server.loopbackBaseUrl}/api/v1/plugins/${bb.pluginId}/http${CALLBACK_PATH}`),
       }),
       myRuns: async () => loadMyRuns(pesto, await owner(), Date.now()),
+      threadRun: ({ threadId }) => runs.threadRun(threadId),
+      startRun: async ({ threadId }) => {
+        await runs.startRun(threadId)
+        return null
+      },
     })
 
     bb.http.route(
