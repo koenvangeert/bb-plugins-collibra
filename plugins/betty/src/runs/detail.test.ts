@@ -2,7 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { fixture } from '../pesto/fakePesto'
 import type { RunNode } from '../pesto/types'
 import { runDetailSchema } from '../pesto/wire'
-import { actionLabel, baseMayMislead, dagColumns, runCondition, spendCeilings, STEP_STATUS_STYLE } from './detail'
+import {
+  actionLabel,
+  attentionFirst,
+  baseMayMislead,
+  dagColumns,
+  nextAction,
+  orderedActions,
+  spendCeilings,
+  spendMeter,
+  STEP_STATUS_STYLE,
+  stepConditions,
+  stepProgress,
+} from './detail'
 
 const { nodes, pullRequests } = runDetailSchema.parse(JSON.parse(fixture('dag-status.json')))
 const named = (name: string) => nodes.find((node) => node.name === name)!
@@ -61,11 +73,72 @@ describe('run detail', () => {
   })
 
   it('says when each step runs', () => {
-    expect(runCondition(named('remediate-app'))).toBe('Only when $validate-app.output.all_met == false')
-    expect(runCondition(named('teardown-env'))).toBe('Always runs')
-    expect(runCondition(named('implement'))).toBe('Runs first')
-    expect(runCondition(named('remediate-review'))).toBe('After implement, review')
-    expect(runCondition(step('x', { when: 'ok', alwaysRun: true, dependsOn: ['a'] }))).toBe('Only when ok · Always runs')
+    expect(stepConditions(named('remediate-app'))).toEqual([{ kind: 'when', expression: '$validate-app.output.all_met == false' }])
+    expect(stepConditions(named('teardown-env'))).toEqual([{ kind: 'always' }])
+    expect(stepConditions(named('implement'))).toEqual([{ kind: 'first' }])
+    expect(stepConditions(named('remediate-review'))).toEqual([{ kind: 'after', steps: ['implement', 'review'] }])
+    expect(stepConditions(step('x', { when: 'ok', alwaysRun: true, dependsOn: ['a'] }))).toEqual([
+      { kind: 'when', expression: 'ok' },
+      { kind: 'always' },
+    ])
+  })
+
+  it('counts finished steps, skipped ones included', () => {
+    expect(stepProgress(nodes)).toEqual({ done: 15, total: 15 })
+    expect(stepProgress([step('a', { status: 'failed' }), step('b', { status: 'running' }), step('c')])).toEqual({ done: 1, total: 3 })
+  })
+
+  it('says what happens next', () => {
+    expect(nextAction(nodes)).toEqual({ kind: 'done' })
+    expect(nextAction([step('a', { status: 'running' }), step('b', { status: 'suspended' }), step('c', { status: 'failed' })])).toEqual({
+      kind: 'decide',
+      step: 'b',
+    })
+    expect(nextAction([step('a', { status: 'running' }), step('c', { status: 'failed' })])).toEqual({ kind: 'failed', step: 'c' })
+    expect(nextAction([step('b', { status: 'running' }), step('a', { status: 'running' }), step('c')])).toEqual({ kind: 'running', steps: ['a', 'b'] })
+    expect(nextAction([step('a', { status: 'succeeded' }), step('b')])).toEqual({ kind: 'waiting' })
+    expect(nextAction([step('a', { status: 'succeeded' }), step('b', { status: 'cancelled' })])).toEqual({ kind: 'cancelled' })
+    expect(nextAction([])).toEqual({ kind: 'waiting' })
+  })
+
+  it('lists the steps that need attention first, then the rest in DAG order', () => {
+    const steps = [
+      step('a', { status: 'succeeded' }),
+      step('b', { dependsOn: ['a'], status: 'running' }),
+      step('c', { dependsOn: ['a'] }),
+      step('d', { dependsOn: ['c'], status: 'suspended' }),
+    ]
+
+    expect(attentionFirst(steps).map((node) => node.name)).toEqual(['b', 'd', 'a', 'c'])
+  })
+
+  it('orders what was done on the pull request as reviews, remediations, then CI', () => {
+    const kinds = orderedActions(pullRequests[0]!.actedOnBy).map((action) => `${action.kind} ${action.name}`)
+
+    expect(kinds).toEqual([
+      'post_review publish-review',
+      'post_review revalidate-app',
+      'post_review validate-app',
+      'remediation_comment remediate-review',
+      'remediation_comment remediate-review-2',
+      'ci_watch reconcile-ci',
+    ])
+  })
+
+  it.each([
+    [4, 'clean', 0.04],
+    [80, 'over-clean', 0.8],
+    [120, 'over-worst', 1],
+  ] as const)('colours a spend of $%d as %s', (spent, tone, spentShare) => {
+    const meter = spendMeter(spent, { cleanRunUsd: 78, worstCaseUsd: 100 })
+
+    expect(meter.tone).toBe(tone)
+    expect(meter.spentShare).toBeCloseTo(spentShare)
+  })
+
+  it('puts the clean run mark on the worst case scale, and copes with no budget', () => {
+    expect(spendMeter(4, { cleanRunUsd: 78, worstCaseUsd: 104 }).cleanShare).toBeCloseTo(0.75)
+    expect(spendMeter(0, { cleanRunUsd: 0, worstCaseUsd: 0 })).toEqual({ tone: 'clean', spentShare: 0, cleanShare: 0 })
   })
 
   it('caps a clean run without the conditional steps and the steps that wait on them', () => {

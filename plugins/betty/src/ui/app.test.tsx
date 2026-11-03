@@ -252,8 +252,10 @@ describe('BETTY run detail', () => {
 
     expect(await slot.findByRole('heading', { name: 'Rename the column' })).toBeTruthy()
     expect(slot.getByText('Watching CI')).toBeTruthy()
-    expect(slot.getByText(/^Spent/).textContent).toBe('Spent $3.66')
-    expect(slot.getByText(/^Clean run/).textContent).toBe('Clean run up to $78.00 · Worst case up to $105.00 (one attempt per step)')
+    expect(slot.getByRole('img', { name: 'Spent $3.66. Clean run up to $78.00 · Worst case up to $105.00 (one attempt per step)' })).toBeTruthy()
+    expect(slot.getByText('$3.66').parentElement!.textContent).toBe('$3.66 spent')
+    expect(slot.getByText('Every step is done')).toBeTruthy()
+    expect(slot.getByText('15/15 steps')).toBeTruthy()
   })
 
   it('reads the run outcome again every 30 seconds', async () => {
@@ -289,14 +291,14 @@ describe('BETTY run detail', () => {
     const section = await slot.findByRole('region', { name: 'Pull request #26731' })
 
     await act(async () => within(section).getByRole('button', { name: 'Open PR #26731' }).click())
-    await act(async () => within(section).getByRole('button', { name: 'Remediation by remediate-review' }).click())
+    await act(async () => within(section).getByRole('button', { name: 'Remediation · remediate-review' }).click())
 
     expect(slot.navigateCalls).toEqual([
       { method: 'openUrl', url: 'https://github.com/collibra/frontend/pull/26731' },
       { method: 'openUrl', url: 'https://github.com/collibra/frontend/pull/26731#issuecomment-6473319138' },
     ])
-    expect(within(section).getByText('Review by revalidate-app').parentElement!.textContent).toBe('Review by revalidate-appplanned')
-    expect(within(section).queryByRole('button', { name: 'Review by revalidate-app' })).toBeNull()
+    expect(within(section).getByText('Review · revalidate-app').parentElement!.textContent).toBe('Review · revalidate-appplanned')
+    expect(within(section).queryByRole('button', { name: 'Review · revalidate-app' })).toBeNull()
   })
 
   it('shows each step with its status, spend against budget and when it runs', async () => {
@@ -306,15 +308,15 @@ describe('BETTY run detail', () => {
     const remediate = within(steps).getByRole('listitem', { name: 'remediate-review' })
     expect(within(remediate).getByText('Done')).toBeTruthy()
     expect(within(remediate).getByText('$0.56/$12.00')).toBeTruthy()
-    expect(within(remediate).getByText('After implement, review')).toBeTruthy()
+    expect(within(remediate).getByText('after implement, review')).toBeTruthy()
 
     const fix = within(steps).getByRole('listitem', { name: 'remediate-app' })
     expect(within(fix).getByText('Skipped')).toBeTruthy()
-    expect(within(fix).getByText('Only when $validate-app.output.all_met == false')).toBeTruthy()
+    expect(within(fix).getByTitle('Only when $validate-app.output.all_met == false').textContent).toBe('$validate-app.output.all_met == false')
 
     const teardown = within(steps).getByRole('listitem', { name: 'teardown-env' })
-    expect(within(teardown).getByText('script')).toBeTruthy()
-    expect(within(teardown).getByText('Always runs')).toBeTruthy()
+    expect(within(teardown).getByTitle('script')).toBeTruthy()
+    expect(within(teardown).getByTitle('Always runs')).toBeTruthy()
   })
 
   it('goes back to the runs', async () => {
@@ -348,7 +350,11 @@ describe('BETTY run tab', () => {
 
     expect(await slot.findByRole('heading', { name: 'Rename the column' })).toBeTruthy()
     expect(slot.getByText(/CI may run only a few checks/)).toBeTruthy()
-    expect(slot.getByText(/^Clean run/).textContent).toBe('Clean run up to $78.00 · Worst case up to $105.00 (one attempt per step)')
+    expect(slot.getByRole('img', { name: /Clean run up to \$78\.00 · Worst case up to \$105\.00/ })).toBeTruthy()
+    expect(slot.queryByRole('listitem', { name: 'remediate-review' })).toBeNull()
+
+    await act(async () => slot.getByRole('button', { name: /^Steps/ }).click())
+
     expect(slot.getByRole('listitem', { name: 'remediate-review' }).textContent).toContain('$0.56/$12.00')
   })
 
