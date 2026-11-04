@@ -43,11 +43,11 @@ describe('stop plan', () => {
     expect(plan(nodes)).toEqual({ steps: [['watch-ci', 'deny']], stillRuns: [] })
   })
 
-  it('stops a pending step whose dependencies are all finished', () => {
+  it('stops a queued step and leaves a pending one to PESTO', () => {
     const nodes = [
       step('implement', { status: 'succeeded' }),
       step('lint', { status: 'skipped' }),
-      step('review', { dependsOn: ['implement', 'lint'] }),
+      step('review', { status: 'queued', dependsOn: ['implement', 'lint'] }),
       step('publish', { dependsOn: ['review'] }),
     ]
 
