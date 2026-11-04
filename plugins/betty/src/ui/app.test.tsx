@@ -319,6 +319,17 @@ describe('BETTY run detail', () => {
     expect(within(teardown).getByTitle('Always runs')).toBeTruthy()
   })
 
+  it('shows a queued step as queued', async () => {
+    const queued: RunDetail = {
+      ...FIXTURE_DETAIL,
+      nodes: FIXTURE_DETAIL.nodes.map((node) => (node.name === 'teardown-env' ? { ...node, status: 'queued' } : node)),
+    }
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => queued)
+    const steps = await slot.findByRole('region', { name: 'Steps' })
+
+    expect(within(within(steps).getByRole('listitem', { name: 'teardown-env' })).getByText('Queued')).toBeTruthy()
+  })
+
   it('goes back to the runs', async () => {
     const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'))
 

@@ -16,7 +16,7 @@ const STATUS_BY_PRIORITY: readonly [RunStatus, readonly NodeStatus[]][] = [
   ['running', ['running']],
   ['failed', ['failed']],
   ['cancelled', ['cancelled']],
-  ['running', ['pending']],
+  ['running', ['pending', 'queued']],
 ]
 
 const DONE_NODE_STATUSES: readonly NodeStatus[] = ['succeeded', 'skipped', 'failed', 'cancelled']

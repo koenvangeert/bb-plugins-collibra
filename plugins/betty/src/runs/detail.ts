@@ -30,6 +30,7 @@ type StepStatusStyle = { label: string; icon: string; text: string; border: stri
 
 export const STEP_STATUS_STYLE: Record<NodeStatus, StepStatusStyle> = {
   pending: { label: 'Pending', icon: 'Circle', text: 'text-slate-500 dark:text-slate-400', border: 'border-l-slate-300 dark:border-l-slate-600', fill: 'bg-slate-300 dark:bg-slate-600' },
+  queued: { label: 'Queued', icon: 'Clock', text: 'text-slate-500 dark:text-slate-400', border: 'border-l-slate-400 dark:border-l-slate-500', fill: 'bg-slate-400 dark:bg-slate-500' },
   running: { label: 'Running', icon: 'Loading', text: 'text-blue-600 dark:text-blue-400', border: 'border-l-blue-500', fill: 'bg-blue-500', spin: true },
   suspended: { label: 'Needs a decision', icon: 'Pause', text: 'text-amber-600 dark:text-amber-400', border: 'border-l-amber-500', fill: 'bg-amber-500' },
   succeeded: { label: 'Done', icon: 'CircleCheck', text: 'text-green-600 dark:text-green-400', border: 'border-l-green-500', fill: 'bg-green-500' },
@@ -88,7 +89,7 @@ export function stepConditions(node: RunNode): StepCondition[] {
   return [node.dependsOn.length === 0 ? { kind: 'first' } : { kind: 'after', steps: node.dependsOn }]
 }
 
-const NOT_STARTED: ReadonlySet<NodeStatus> = new Set(['pending', 'skipped', 'unknown'])
+const NOT_STARTED: ReadonlySet<NodeStatus> = new Set(['pending', 'queued', 'skipped', 'unknown'])
 
 function cleanRunSkips(nodes: readonly RunNode[]): Set<string> {
   const byName = new Map(nodes.map((node) => [node.name, node]))
