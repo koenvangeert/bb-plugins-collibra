@@ -10,7 +10,7 @@ export const RUN_OUTCOMES = [
 ] as const
 export type RunOutcome = (typeof RUN_OUTCOMES)[number] | 'unknown'
 
-export const NODE_STATUSES = ['pending', 'queued', 'running', 'suspended', 'succeeded', 'skipped', 'failed', 'cancelled'] as const
+export const NODE_STATUSES = ['pending', 'queued', 'claimed', 'running', 'suspended', 'succeeded', 'skipped', 'failed', 'cancelled'] as const
 export type NodeStatus = (typeof NODE_STATUSES)[number] | 'unknown'
 
 export const PULL_REQUEST_STATES = ['draft', 'open', 'merged', 'closed'] as const

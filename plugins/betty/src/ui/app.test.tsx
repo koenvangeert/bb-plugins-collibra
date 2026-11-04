@@ -319,15 +319,18 @@ describe('BETTY run detail', () => {
     expect(within(teardown).getByTitle('Always runs')).toBeTruthy()
   })
 
-  it('shows a queued step as queued', async () => {
-    const queued: RunDetail = {
+  it.each([
+    ['queued', 'Queued'],
+    ['claimed', 'Starting'],
+  ] as const)('shows a %s step as %s', async (status, label) => {
+    const detail: RunDetail = {
       ...FIXTURE_DETAIL,
-      nodes: FIXTURE_DETAIL.nodes.map((node) => (node.name === 'teardown-env' ? { ...node, status: 'queued' } : node)),
+      nodes: FIXTURE_DETAIL.nodes.map((node) => (node.name === 'teardown-env' ? { ...node, status } : node)),
     }
-    const slot = renderDetail(FIXTURE_DETAIL.runId, () => queued)
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detail)
     const steps = await slot.findByRole('region', { name: 'Steps' })
 
-    expect(within(within(steps).getByRole('listitem', { name: 'teardown-env' })).getByText('Queued')).toBeTruthy()
+    expect(within(within(steps).getByRole('listitem', { name: 'teardown-env' })).getByText(label)).toBeTruthy()
   })
 
   it('goes back to the runs', async () => {
