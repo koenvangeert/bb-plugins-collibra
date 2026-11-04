@@ -252,7 +252,7 @@ function ApproveForm({ node, onDone }: { node: RunNode; onDone: () => void }) {
     >
       <label className="flex flex-col gap-1 text-xs">
         New budget (USD)
-        <input type="number" min="0" step="0.01" className={FIELD} value={budget} onChange={(event) => setBudget(event.target.value)} />
+        <input type="number" min="0" step="any" className={FIELD} value={budget} onChange={(event) => setBudget(event.target.value)} />
       </label>
       {!aboveSpend && <p className="m-0 text-xs text-destructive">The budget must be more than the {money(node.costUsd)} this step spent.</p>}
       <label className="flex flex-col gap-1 text-xs">
