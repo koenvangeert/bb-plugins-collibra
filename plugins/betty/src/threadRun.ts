@@ -1,5 +1,6 @@
 import type { PestoClient } from './pesto/client'
 import { runChip, type RunChip, type ThreadRun } from './runChip'
+import type { WatchedRun } from './runWatcher'
 
 export const LINK_TOOL = 'betty_link_run'
 
@@ -27,7 +28,15 @@ export function startRunPrompt(ticketKey: string | null): string {
   ].join('\n')
 }
 
-export function createThreadRuns({ sdk, pesto }: { sdk: ThreadRunSdk; pesto: Pick<PestoClient, 'dagStatus'> }) {
+export function createThreadRuns({
+  sdk,
+  pesto,
+  watch,
+}: {
+  sdk: ThreadRunSdk
+  pesto: Pick<PestoClient, 'dagStatus'>
+  watch: (run: WatchedRun) => void
+}) {
   const linkedRunId = async (threadId: string): Promise<string | null> => {
     const { runId } = await sdk.threads.getPluginMetadata({ threadId })
     return typeof runId === 'string' && runId !== '' ? runId : null
@@ -58,6 +67,7 @@ export function createThreadRuns({ sdk, pesto }: { sdk: ThreadRunSdk; pesto: Pic
     async link(threadId: string, runId: string): Promise<RunChip> {
       const chip = runChip(await pesto.dagStatus(runId))
       await sdk.threads.updatePluginMetadata({ threadId, set: { runId } })
+      watch({ runId, threadId, status: chip.status })
       return chip
     },
 

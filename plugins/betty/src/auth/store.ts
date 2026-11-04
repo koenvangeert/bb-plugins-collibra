@@ -13,6 +13,18 @@ export const MIGRATIONS = [
     id INTEGER PRIMARY KEY CHECK (id = 1),
     state TEXT NOT NULL
   )`,
+  // Unused, but a prototype already applied it to the shared plugin database at this index.
+  `CREATE TABLE client_registrations (
+    base_url TEXT NOT NULL,
+    redirect_uri TEXT NOT NULL,
+    client_id TEXT NOT NULL,
+    PRIMARY KEY (base_url, redirect_uri)
+  )`,
+  `CREATE TABLE watched_runs (
+    run_id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL,
+    status TEXT NOT NULL
+  )`,
 ]
 
 const tokens = z.object({ accessToken: z.string(), refreshToken: z.string().nullable(), expiresAt: z.number() })
