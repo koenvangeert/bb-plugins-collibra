@@ -90,7 +90,7 @@ export function createMcpSession(options: {
     try {
       return JSON.parse(text) as unknown
     } catch {
-      throw new PestoError(withoutToken(text || `BETTY sent an unreadable answer to ${name}`, token))
+      return text
     }
   }
 

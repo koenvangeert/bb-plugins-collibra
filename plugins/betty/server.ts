@@ -6,6 +6,7 @@ import { createAuthStore, MIGRATIONS } from './src/auth/store'
 import { createPestoClient } from './src/pesto/client'
 import { createMcpSession, PestoError } from './src/pesto/mcp'
 import { rpcContract } from './src/rpc'
+import { stopRun } from './src/runs/decide'
 import { loadMyRuns } from './src/runs/myRuns'
 import { chipLabel } from './src/runChip'
 import { createRunWatcher } from './src/runWatcher'
@@ -98,6 +99,21 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
         return null
       },
       runDetail: ({ runId }) => pesto.dagStatus(runId),
+      approveStep: async (approval) => {
+        await pesto.approve(approval)
+        bb.rpc.experimental_invalidateAll()
+        return null
+      },
+      denyStep: async (denial) => {
+        await pesto.deny(denial)
+        bb.rpc.experimental_invalidateAll()
+        return null
+      },
+      stopRun: async ({ runId }) => {
+        const result = await stopRun(pesto, runId)
+        bb.rpc.experimental_invalidateAll()
+        return result
+      },
     })
 
     bb.http.route(

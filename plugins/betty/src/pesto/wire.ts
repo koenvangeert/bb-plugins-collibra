@@ -116,6 +116,7 @@ const node = z
     budget: z.string().optional(),
     started_at: z.string().optional(),
     completed_at: z.string().optional(),
+    error: z.string().optional(),
   })
   .transform(
     (node): RunNode => ({
@@ -130,6 +131,7 @@ const node = z
       budgetUsd: budgetLimit(node.budget),
       ...(node.started_at === undefined ? {} : { startedAt: node.started_at }),
       ...(node.completed_at === undefined ? {} : { completedAt: node.completed_at }),
+      ...(node.error === undefined ? {} : { error: node.error }),
     }),
   )
 

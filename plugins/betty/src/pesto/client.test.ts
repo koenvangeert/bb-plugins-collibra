@@ -96,6 +96,19 @@ describe('PESTO client', () => {
     expect(node('publish-review')!.executor).toBe('publisher')
   })
 
+  it('reads why a step waits for a decision', async () => {
+    const run = JSON.parse(fixture('dag-status.json'))
+    run.nodes[1].status = 'suspended'
+    run.nodes[1].error = 'ci is red after 2 remediation attempt(s) (max 2)'
+    const pesto = createFakePesto({ tools: { pesto_dag_status: { text: JSON.stringify(run) } } })
+    const { client } = connect(pesto)
+
+    const detail = await client.dagStatus('r')
+
+    expect(detail.nodes[1]).toMatchObject({ status: 'suspended', error: 'ci is red after 2 remediation attempt(s) (max 2)' })
+    expect(detail.nodes[0]).not.toHaveProperty('error')
+  })
+
   it('reads an artifact by task and kind', async () => {
     const pesto = createFakePesto({ tools: fixtureTools })
     const { client } = connect(pesto)
@@ -290,5 +303,59 @@ describe('MCP session', () => {
     expect(error).toBeInstanceOf(PestoError)
     expect(error.message).toContain(text)
     expect(error.message).not.toContain(TOKEN)
+  })
+
+  it('refuses a plain text answer to a read as an unexpected answer', async () => {
+    const pesto = createFakePesto({ tools: { pesto_dag_status: { text: 'run r is busy' } } })
+    const { client } = connect(pesto)
+
+    const error = await caught(client.dagStatus('r'))
+
+    expect(error).toBeInstanceOf(PestoError)
+    expect(error.message).toContain('unexpected answer to pesto_dag_status')
+  })
+
+  it('approves a step with a new budget and a hint, and accepts a plain text answer', async () => {
+    const pesto = createFakePesto({ tools: { pesto_task_approve: { text: 'approved' } } })
+    const { client } = connect(pesto)
+
+    await client.approve({ taskId: 't1', budgetUsd: 12, hint: 'Retry with the flaky test skipped.' })
+
+    expect(pesto.toolCalls()[0]!.body!.params).toEqual({
+      name: 'pesto_task_approve',
+      arguments: { task_id: 't1', cost_budget_usd: 12, hint: 'Retry with the flaky test skipped.' },
+    })
+  })
+
+  it.each([undefined, ''])('approves without a hint when the hint is %j', async (hint) => {
+    const pesto = createFakePesto({ tools: { pesto_task_approve: { text: '{}' } } })
+    const { client } = connect(pesto)
+
+    await client.approve({ taskId: 't1', budgetUsd: 12, hint })
+
+    expect(pesto.toolCalls()[0]!.body!.params!.arguments).toEqual({ task_id: 't1', cost_budget_usd: 12 })
+  })
+
+  it('denies and stops a step with a reason', async () => {
+    const pesto = createFakePesto({ tools: { pesto_task_deny: { text: 'denied' }, pesto_task_stop: { text: 'stopped' } } })
+    const { client } = connect(pesto)
+
+    await client.deny({ taskId: 't1', reason: 'Wrong approach.' })
+    await client.stop({ taskId: 't2', reason: 'Stopped from bb.' })
+
+    expect(pesto.toolCalls().map((call) => call.body!.params)).toEqual([
+      { name: 'pesto_task_deny', arguments: { task_id: 't1', reason: 'Wrong approach.' } },
+      { name: 'pesto_task_stop', arguments: { task_id: 't2', reason: 'Stopped from bb.' } },
+    ])
+  })
+
+  it('surfaces a refused approval as a PestoError', async () => {
+    const pesto = createFakePesto({ tools: { pesto_task_approve: { text: 'budget must exceed spend', isError: true } } })
+    const { client } = connect(pesto)
+
+    const error = await caught(client.approve({ taskId: 't1', budgetUsd: 1 }))
+
+    expect(error).toBeInstanceOf(PestoError)
+    expect(error.message).toContain('budget must exceed spend')
   })
 })

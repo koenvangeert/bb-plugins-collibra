@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { experimental_Icon as Icon, experimental_useRpcQuery, useBbNavigate } from '@get-bb/plugin-sdk/app'
+import { experimental_Icon as Icon, experimental_useRpcMutation, experimental_useRpcQuery, useBbNavigate } from '@get-bb/plugin-sdk/app'
 import type { PullRequest, PullRequestAction, RunNode, RunSummary } from '../pesto/types'
 import { rpcContract } from '../rpc'
 import { OUTCOME_STYLE, PR_STATE_STYLE } from '../runs/board'
+import { approveBudget, stopPlan } from '../runs/decide'
 import {
   actionIcon,
   actionLabel,
@@ -94,6 +95,8 @@ function Header({
   compact: boolean
 }) {
   const outcome = summary && OUTCOME_STYLE[summary.outcome]
+  const plan = stopPlan(nodes)
+  const [stopping, setStopping] = useState(false)
   return (
     <header className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
       <div className="flex flex-col gap-1">
@@ -101,19 +104,181 @@ function Header({
           <h2 className={`m-0 min-w-0 font-semibold leading-snug ${compact ? 'text-base' : 'text-lg'}`} title={compact ? runId : undefined}>
             {summary?.title ?? runId}
           </h2>
-          {outcome && (
-            <span className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${outcome.pill}`}>
-              <Icon name={outcome.icon} fallback="Circle" aria-hidden className={`size-3.5 ${summary?.outcome === 'running' ? 'animate-spin' : ''}`} />
-              {outcome.label}
-            </span>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            {outcome && (
+              <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${outcome.pill}`}>
+                <Icon name={outcome.icon} fallback="Circle" aria-hidden className={`size-3.5 ${summary?.outcome === 'running' ? 'animate-spin' : ''}`} />
+                {outcome.label}
+              </span>
+            )}
+            {!stopping && plan.steps.length > 0 && (
+              <button type="button" className={BUTTON} onClick={() => setStopping(true)}>
+                Stop run
+              </button>
+            )}
+          </div>
         </div>
         {!compact && <span className="font-mono text-xs text-muted-foreground">{runId}</span>}
       </div>
+      <StopRun runId={runId} plan={plan} confirming={stopping} onClose={() => setStopping(false)} />
       <NextActionCallout action={nextAction(nodes)} />
+      {nodes
+        .filter((node) => node.status === 'suspended')
+        .map((node) => (
+          <DecisionCard key={node.taskId} node={node} />
+        ))}
       <SpendBar spentUsd={spentUsd} nodes={nodes} />
       {!compact && <StepProgress nodes={nodes} />}
     </header>
+  )
+}
+
+const BUTTON = 'rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50'
+const FIELD = 'rounded-md border border-border bg-background px-2 py-1 text-sm'
+
+function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? '' : 's'}`
+}
+
+function StopRun({
+  runId,
+  plan,
+  confirming,
+  onClose,
+}: {
+  runId: string
+  plan: ReturnType<typeof stopPlan>
+  confirming: boolean
+  onClose: () => void
+}) {
+  const stop = experimental_useRpcMutation({ contract: rpcContract, method: 'stopRun' })
+  const [failed, setFailed] = useState<{ step: string; error: string }[]>([])
+  const names = plan.stillRuns.map((node) => node.name)
+
+  const submit = () =>
+    stop.mutate({ runId }).then(
+      (result) => {
+        setFailed(result.failed)
+        onClose()
+      },
+      () => {},
+    )
+
+  return (
+    <>
+      {confirming && plan.steps.length > 0 && (
+        <div role="group" aria-label="Stop the run" className="flex flex-col gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm">
+          <p className="m-0">
+            Stop {plural(plan.steps.length, 'step')}?
+            {names.length > 0 && ` ${names.join(', ')} still ${names.length === 1 ? 'runs' : 'run'}.`}
+          </p>
+          <div className="flex gap-2">
+            <button type="button" className={BUTTON} disabled={stop.isPending} onClick={submit}>
+              Stop run
+            </button>
+            <button type="button" className={BUTTON} onClick={onClose}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {stop.error && <p role="alert" className="m-0 text-sm text-destructive">{stop.error.message}</p>}
+      {failed.length > 0 && (
+        <div role="alert" className="flex flex-col gap-1 text-sm text-destructive">
+          <span>Could not stop {plural(failed.length, 'step')}:</span>
+          <ul className="m-0 pl-4">
+            {failed.map(({ step, error }) => (
+              <li key={step}>
+                {step}: {error}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  )
+}
+
+function DecisionCard({ node }: { node: RunNode }) {
+  const [form, setForm] = useState<'approve' | 'deny' | null>(null)
+  const done = () => setForm(null)
+  return (
+    <section aria-label={`Decide on ${node.name}`} className="flex flex-col gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-medium">{node.name}</span>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          Spent {money(node.costUsd)}
+          {node.budgetUsd !== null && ` of ${money(node.budgetUsd)}`}
+        </span>
+      </div>
+      {node.error && <p className="m-0 whitespace-pre-wrap break-words text-xs text-muted-foreground">{node.error}</p>}
+      <div className="flex gap-2">
+        <button type="button" aria-expanded={form === 'approve'} className={BUTTON} onClick={() => setForm(form === 'approve' ? null : 'approve')}>
+          Approve
+        </button>
+        <button type="button" aria-expanded={form === 'deny'} className={BUTTON} onClick={() => setForm(form === 'deny' ? null : 'deny')}>
+          Deny
+        </button>
+      </div>
+      {form === 'approve' && <ApproveForm node={node} onDone={done} />}
+      {form === 'deny' && <DenyForm node={node} onDone={done} />}
+    </section>
+  )
+}
+
+function ApproveForm({ node, onDone }: { node: RunNode; onDone: () => void }) {
+  const approve = experimental_useRpcMutation({ contract: rpcContract, method: 'approveStep' })
+  const [budget, setBudget] = useState(String(approveBudget(node) ?? ''))
+  const [hint, setHint] = useState('')
+  const budgetUsd = Number(budget)
+  const aboveSpend = budget.trim() !== '' && budgetUsd > node.costUsd
+  return (
+    <form
+      aria-label={`Approve ${node.name}`}
+      className="flex flex-col gap-2"
+      onSubmit={(event) => {
+        event.preventDefault()
+        approve.mutate({ taskId: node.taskId, budgetUsd, hint }).then(onDone, () => {})
+      }}
+    >
+      <label className="flex flex-col gap-1 text-xs">
+        New budget (USD)
+        <input type="number" min="0" step="any" className={FIELD} value={budget} onChange={(event) => setBudget(event.target.value)} />
+      </label>
+      {!aboveSpend && <p className="m-0 text-xs text-destructive">The budget must be more than the {money(node.costUsd)} this step spent.</p>}
+      <label className="flex flex-col gap-1 text-xs">
+        Hint (optional)
+        <textarea rows={2} className={FIELD} value={hint} onChange={(event) => setHint(event.target.value)} />
+      </label>
+      <button type="submit" className={`${BUTTON} self-start`} disabled={!aboveSpend || approve.isPending}>
+        Approve
+      </button>
+      {approve.error && <p role="alert" className="m-0 text-sm text-destructive">{approve.error.message}</p>}
+    </form>
+  )
+}
+
+function DenyForm({ node, onDone }: { node: RunNode; onDone: () => void }) {
+  const deny = experimental_useRpcMutation({ contract: rpcContract, method: 'denyStep' })
+  const [reason, setReason] = useState('')
+  return (
+    <form
+      aria-label={`Deny ${node.name}`}
+      className="flex flex-col gap-2"
+      onSubmit={(event) => {
+        event.preventDefault()
+        deny.mutate({ taskId: node.taskId, reason }).then(onDone, () => {})
+      }}
+    >
+      <label className="flex flex-col gap-1 text-xs">
+        Reason
+        <textarea rows={2} className={FIELD} value={reason} onChange={(event) => setReason(event.target.value)} />
+      </label>
+      <button type="submit" className={`${BUTTON} self-start`} disabled={reason.trim() === '' || deny.isPending}>
+        Deny
+      </button>
+      {deny.error && <p role="alert" className="m-0 text-sm text-destructive">{deny.error.message}</p>}
+    </form>
   )
 }
 

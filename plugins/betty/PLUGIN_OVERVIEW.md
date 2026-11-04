@@ -9,6 +9,7 @@ Start and follow BETTY (PESTO) runs from bb.
 - A `betty_link_run` agent tool. The agent calls it after it submits a run, to link the run to the thread.
 - A run watcher. Every 30 seconds it checks each linked run. It sends the thread one message when the run needs a decision, fails, is cancelled or finishes.
 - A **run detail** when you click a run. It shows the steps in columns with their status, spend against budget and run condition. It shows the spend so far, the most a clean run can cost (no conditional fix-up steps and no steps that wait on them) and the worst case (every step once). Each pull request has a link, the steps that reviewed or remediated it with links to GitHub, and a warning when its base is not `main`, because CI may then run only a few checks.
+- **Decisions from the run detail.** Approve a step that waits for a decision with a new budget and a hint, deny it with a reason, or stop the whole run. A stop still lets `always_run` steps such as the teardown run.
 
 ## How it works
 
