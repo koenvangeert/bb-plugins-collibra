@@ -67,6 +67,7 @@ export type RunNode = {
   budgetUsd: number | null
   startedAt?: string
   completedAt?: string
+  error?: string
 }
 
 export type RunDetail = {

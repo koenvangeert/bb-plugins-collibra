@@ -67,6 +67,7 @@ const runDetail = z.object({
       budgetUsd: z.number().nullable(),
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
+      error: z.string().optional(),
     }),
   ),
   pullRequests: z.array(pullRequest),

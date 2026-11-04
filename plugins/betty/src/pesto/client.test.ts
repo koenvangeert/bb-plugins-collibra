@@ -96,6 +96,19 @@ describe('PESTO client', () => {
     expect(node('publish-review')!.executor).toBe('publisher')
   })
 
+  it('reads why a step waits for a decision', async () => {
+    const run = JSON.parse(fixture('dag-status.json'))
+    run.nodes[1].status = 'suspended'
+    run.nodes[1].error = 'ci is red after 2 remediation attempt(s) (max 2)'
+    const pesto = createFakePesto({ tools: { pesto_dag_status: { text: JSON.stringify(run) } } })
+    const { client } = connect(pesto)
+
+    const detail = await client.dagStatus('r')
+
+    expect(detail.nodes[1]).toMatchObject({ status: 'suspended', error: 'ci is red after 2 remediation attempt(s) (max 2)' })
+    expect(detail.nodes[0]).not.toHaveProperty('error')
+  })
+
   it('reads an artifact by task and kind', async () => {
     const pesto = createFakePesto({ tools: fixtureTools })
     const { client } = connect(pesto)
