@@ -74,7 +74,6 @@ const runDetail = z.object({
 }) satisfies z.ZodType<RunDetail>
 
 const stopResult = z.object({
-  stopped: z.array(z.string()),
   failed: z.array(z.object({ step: z.string(), error: z.string() })),
 })
 
@@ -86,7 +85,7 @@ export const rpcContract = defineRpcContract({
   startRun: { input: threadInput, output: z.null() },
   runDetail: { input: z.object({ runId: z.string().min(1) }), output: runDetail },
   approveStep: {
-    input: z.object({ taskId: z.string().min(1), budgetUsd: z.number().positive(), hint: z.string().optional() }),
+    input: z.object({ taskId: z.string().min(1), budgetUsd: z.number().positive(), hint: z.string().trim().optional() }),
     output: z.null(),
   },
   denyStep: { input: z.object({ taskId: z.string().min(1), reason: z.string().trim().min(1) }), output: z.null() },

@@ -6,14 +6,13 @@ import { createAuthStore, MIGRATIONS } from './src/auth/store'
 import { createPestoClient } from './src/pesto/client'
 import { createMcpSession, PestoError } from './src/pesto/mcp'
 import { rpcContract } from './src/rpc'
-import { stopPlan } from './src/runs/decide'
+import { stopRun } from './src/runs/decide'
 import { loadMyRuns } from './src/runs/myRuns'
 import { chipLabel } from './src/runChip'
 import { mcpEndpoint, SETTINGS } from './src/settings'
 import { createThreadRuns, LINK_TOOL } from './src/threadRun'
 
 const CALLBACK_PATH = '/oauth/callback'
-const STOP_REASON = 'Stopped from bb.'
 
 export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
   async function plugin(bb: BbPluginApi) {
@@ -102,17 +101,9 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
         return null
       },
       stopRun: async ({ runId }) => {
-        const { steps } = stopPlan((await pesto.dagStatus(runId)).nodes)
-        const results = await Promise.allSettled(steps.map(({ node, action }) => pesto[action]({ taskId: node.taskId, reason: STOP_REASON })))
+        const result = await stopRun(pesto, runId)
         bb.rpc.experimental_invalidateAll()
-        const stopped: string[] = []
-        const failed: { step: string; error: string }[] = []
-        results.forEach((result, index) => {
-          const step = steps[index]!.node.name
-          if (result.status === 'fulfilled') stopped.push(step)
-          else failed.push({ step, error: message(result.reason) })
-        })
-        return { stopped, failed }
+        return result
       },
     })
 

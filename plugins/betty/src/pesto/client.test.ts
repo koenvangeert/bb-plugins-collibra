@@ -327,7 +327,7 @@ describe('MCP session', () => {
     })
   })
 
-  it.each([undefined, '', '  '])('approves without a hint when the hint is %j', async (hint) => {
+  it.each([undefined, ''])('approves without a hint when the hint is %j', async (hint) => {
     const pesto = createFakePesto({ tools: { pesto_task_approve: { text: '{}' } } })
     const { client } = connect(pesto)
 

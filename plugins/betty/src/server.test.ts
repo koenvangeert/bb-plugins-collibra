@@ -261,6 +261,25 @@ describe('decisions', () => {
     expect(sent('pesto_task_approve')).toEqual([{ task_id: 't-watch-ci', cost_budget_usd: 12, hint: 'Skip the flaky test.' }])
   })
 
+  it.each(['', '  '])('approves without a hint when the hint is %j', async (hint) => {
+    const { host, sent } = await actingHost({ pesto_task_approve: { text: 'approved' } })
+
+    await host.harness.behavior.callRpc('approveStep', { taskId: 't-watch-ci', budgetUsd: 12, hint })
+
+    expect(sent('pesto_task_approve')).toEqual([{ task_id: 't-watch-ci', cost_budget_usd: 12 }])
+  })
+
+  it('reads the runs again after each decision', async () => {
+    const { host } = await actingHost({ pesto_task_approve: { text: 'approved' }, pesto_task_deny: { text: 'denied' }, pesto_task_stop: { text: 'stopped' } })
+    const before = host.harness.inspection.experimental_rpcInvalidations.length
+
+    await host.harness.behavior.callRpc('approveStep', { taskId: 't-watch-ci', budgetUsd: 12 })
+    await host.harness.behavior.callRpc('denyStep', { taskId: 't-watch-ci', reason: 'No.' })
+    await host.harness.behavior.callRpc('stopRun', { runId: 'run-1' })
+
+    expect(host.harness.inspection.experimental_rpcInvalidations.length - before).toBe(3)
+  })
+
   it('denies a step with the reason', async () => {
     const { host, sent } = await actingHost({ pesto_task_deny: { text: 'denied' } })
 
@@ -291,7 +310,7 @@ describe('decisions', () => {
     expect(sent('pesto_dag_status')).toEqual([{ run_id: 'run-1' }])
     expect(sent('pesto_task_stop')).toEqual([{ task_id: 't-implement', reason: 'Stopped from bb.' }])
     expect(sent('pesto_task_deny')).toEqual([{ task_id: 't-watch-ci', reason: 'Stopped from bb.' }])
-    expect(result).toEqual({ stopped: ['implement', 'watch-ci'], failed: [] })
+    expect(result).toEqual({ failed: [] })
   })
 
   it('reports a step that PESTO refuses to stop and still stops the others', async () => {
@@ -302,6 +321,6 @@ describe('decisions', () => {
 
     const result = await host.harness.behavior.callRpc('stopRun', { runId: 'run-1' })
 
-    expect(result).toEqual({ stopped: ['watch-ci'], failed: [{ step: 'implement', error: 'task t-implement already finished' }] })
+    expect(result).toEqual({ failed: [{ step: 'implement', error: 'task t-implement already finished' }] })
   })
 })

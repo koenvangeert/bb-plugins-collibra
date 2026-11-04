@@ -71,7 +71,7 @@ export function RunDetail({ runId, compact = false }: { runId: string; compact?:
 
   return (
     <div className="flex flex-col gap-4">
-      <Header runId={runId} summary={summary} nodes={nodes} spentUsd={totalCostUsd} compact={compact} onChange={query.refetch} />
+      <Header runId={runId} summary={summary} nodes={nodes} spentUsd={totalCostUsd} compact={compact} />
       {query.error && <p role="alert" className="m-0 text-sm text-destructive">{query.error.message}</p>}
       {pullRequests.map((pr) => (
         <PullRequestCard key={pr.url} pr={pr} />
@@ -87,14 +87,12 @@ function Header({
   nodes,
   spentUsd,
   compact,
-  onChange,
 }: {
   runId: string
   summary: RunSummary | undefined
   nodes: RunNode[]
   spentUsd: number
   compact: boolean
-  onChange: () => unknown
 }) {
   const outcome = summary && OUTCOME_STYLE[summary.outcome]
   const plan = stopPlan(nodes)
@@ -122,12 +120,12 @@ function Header({
         </div>
         {!compact && <span className="font-mono text-xs text-muted-foreground">{runId}</span>}
       </div>
-      <StopRun runId={runId} plan={plan} confirming={stopping} onClose={() => setStopping(false)} onChange={onChange} />
+      <StopRun runId={runId} plan={plan} confirming={stopping} onClose={() => setStopping(false)} />
       <NextActionCallout action={nextAction(nodes)} />
       {nodes
         .filter((node) => node.status === 'suspended')
         .map((node) => (
-          <DecisionCard key={node.taskId} node={node} onChange={onChange} />
+          <DecisionCard key={node.taskId} node={node} />
         ))}
       <SpendBar spentUsd={spentUsd} nodes={nodes} />
       {!compact && <StepProgress nodes={nodes} />}
@@ -147,13 +145,11 @@ function StopRun({
   plan,
   confirming,
   onClose,
-  onChange,
 }: {
   runId: string
   plan: ReturnType<typeof stopPlan>
   confirming: boolean
   onClose: () => void
-  onChange: () => unknown
 }) {
   const stop = experimental_useRpcMutation({ contract: rpcContract, method: 'stopRun' })
   const [failed, setFailed] = useState<{ step: string; error: string }[]>([])
@@ -164,7 +160,6 @@ function StopRun({
       (result) => {
         setFailed(result.failed)
         onClose()
-        void onChange()
       },
       () => {},
     )
@@ -204,12 +199,9 @@ function StopRun({
   )
 }
 
-function DecisionCard({ node, onChange }: { node: RunNode; onChange: () => unknown }) {
+function DecisionCard({ node }: { node: RunNode }) {
   const [form, setForm] = useState<'approve' | 'deny' | null>(null)
-  const done = () => {
-    setForm(null)
-    void onChange()
-  }
+  const done = () => setForm(null)
   return (
     <section aria-label={`Decide on ${node.name}`} className="flex flex-col gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -246,8 +238,7 @@ function ApproveForm({ node, onDone }: { node: RunNode; onDone: () => void }) {
       className="flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault()
-        const trimmed = hint.trim()
-        approve.mutate({ taskId: node.taskId, budgetUsd, ...(trimmed ? { hint: trimmed } : {}) }).then(onDone, () => {})
+        approve.mutate({ taskId: node.taskId, budgetUsd, hint }).then(onDone, () => {})
       }}
     >
       <label className="flex flex-col gap-1 text-xs">

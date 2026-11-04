@@ -361,11 +361,11 @@ const DECISION_DETAIL: RunDetail = {
 
 const REVIEW_2 = DECISION_DETAIL.nodes.find((node) => node.name === 'review-2')!
 
-function renderDecision(handlers: { approveStep?: () => null; denyStep?: () => null; stopRun?: () => { stopped: string[]; failed: { step: string; error: string }[] } } = {}) {
+function renderDecision(handlers: { approveStep?: () => null; denyStep?: () => null; stopRun?: () => { failed: { step: string; error: string }[] } } = {}) {
   const runDetail = vi.fn(() => DECISION_DETAIL)
   const approveStep = vi.fn(handlers.approveStep ?? (() => null))
   const denyStep = vi.fn(handlers.denyStep ?? (() => null))
-  const stopRun = vi.fn(handlers.stopRun ?? (() => ({ stopped: ['review-2'], failed: [] })))
+  const stopRun = vi.fn(handlers.stopRun ?? (() => ({ failed: [] })))
   const slot = renderSlot(app.navPanels[0]!, { subPath: DECISION_DETAIL.runId }, {
     rpc: {
       authStatus: () => ({ state: 'signed-in' }),
@@ -390,19 +390,17 @@ describe('BETTY decisions', () => {
     expect(within(card).getByText('Spent $0.35 of $6.00')).toBeTruthy()
   })
 
-  it('approves a step with double the old budget and a hint, then reads the run again', async () => {
-    const { slot, runDetail, approveStep } = renderDecision()
+  it('approves a step with double the old budget and a hint', async () => {
+    const { slot, approveStep } = renderDecision()
     const card = await slot.findByRole('region', { name: 'Decide on review-2' })
 
     await act(async () => within(card).getByRole('button', { name: 'Approve' }).click())
     const form = within(card).getByRole('form', { name: 'Approve review-2' })
     expect((within(form).getByLabelText('New budget (USD)') as HTMLInputElement).value).toBe('12')
     await act(async () => fireEvent.change(within(form).getByLabelText('Hint (optional)'), { target: { value: 'Skip the flaky test.' } }))
-    const readsBefore = runDetail.mock.calls.length
     await act(async () => within(form).getByRole('button', { name: 'Approve' }).click())
 
     expect(approveStep).toHaveBeenCalledWith({ taskId: REVIEW_2.taskId, budgetUsd: 12, hint: 'Skip the flaky test.' })
-    expect(runDetail.mock.calls.length).toBeGreaterThan(readsBefore)
     expect(within(card).queryByRole('form')).toBeNull()
   })
 
@@ -465,7 +463,7 @@ describe('BETTY decisions', () => {
   })
 
   it('shows the steps that did not stop', async () => {
-    const { slot } = renderDecision({ stopRun: () => ({ stopped: [], failed: [{ step: 'review-2', error: 'task already finished' }] }) })
+    const { slot } = renderDecision({ stopRun: () => ({ failed: [{ step: 'review-2', error: 'task already finished' }] }) })
 
     await act(async () => (await slot.findByRole('button', { name: 'Stop run' })).click())
     await act(async () => within(slot.getByRole('group', { name: 'Stop the run' })).getByRole('button', { name: 'Stop run' }).click())
