@@ -73,6 +73,11 @@ const runDetail = z.object({
   pullRequests: z.array(pullRequest),
 }) satisfies z.ZodType<RunDetail>
 
+const stopResult = z.object({
+  stopped: z.array(z.string()),
+  failed: z.array(z.object({ step: z.string(), error: z.string() })),
+})
+
 export const rpcContract = defineRpcContract({
   authStatus: { input: z.null(), output: z.object({ state: z.enum(AUTH_KINDS) }) },
   startSignIn: { input: z.null(), output: z.object({ url: z.url({ protocol: /^https$/ }) }) },
@@ -80,4 +85,10 @@ export const rpcContract = defineRpcContract({
   threadRun: { input: threadInput, output: threadRunSchema },
   startRun: { input: threadInput, output: z.null() },
   runDetail: { input: z.object({ runId: z.string().min(1) }), output: runDetail },
+  approveStep: {
+    input: z.object({ taskId: z.string().min(1), budgetUsd: z.number().positive(), hint: z.string().optional() }),
+    output: z.null(),
+  },
+  denyStep: { input: z.object({ taskId: z.string().min(1), reason: z.string().trim().min(1) }), output: z.null() },
+  stopRun: { input: z.object({ runId: z.string().min(1) }), output: stopResult },
 })

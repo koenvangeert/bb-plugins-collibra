@@ -155,12 +155,15 @@ describe('BETTY sign-in', () => {
   })
 })
 
-function bettyWithPesto(whoami: () => { text: string } = () => ({ text: fixture('whoami.json') })) {
+type Tools = NonNullable<Parameters<typeof createFakePesto>[0]['tools']>
+
+function bettyWithPesto(whoami: () => { text: string } = () => ({ text: fixture('whoami.json') }), tools: Tools = {}) {
   const betty = createFakeBetty()
   const pesto = createFakePesto({
     tools: {
       pesto_whoami: whoami,
       pesto_dag_status: (args: Record<string, unknown>) => ({ text: fixture(args.run_id ? 'dag-status.json' : 'run-list.json') }),
+      ...tools,
     },
   })
   const fetch: typeof globalThis.fetch = (input, init) =>
@@ -226,5 +229,79 @@ describe('run detail', () => {
 
     await expect(host.harness.behavior.callRpc('runDetail', { runId: '' })).rejects.toThrow()
     expect(pesto.toolCalls().filter((call) => call.body!.params!.name === 'pesto_dag_status')).toEqual([])
+  })
+})
+
+const RUNNING_RUN = JSON.stringify({
+  run_id: 'run-1',
+  total_cost_usd: 2.5,
+  nodes: [
+    { task_id: 't-implement', name: 'implement', executor: 'agent', status: 'running', budget: '$1.00/$15.00' },
+    { task_id: 't-review', name: 'review', executor: 'agent', status: 'pending', depends_on: ['implement'] },
+    { task_id: 't-watch-ci', name: 'watch-ci', executor: 'agent', status: 'suspended', budget: '$4.27/$6.00' },
+    { task_id: 't-teardown', name: 'teardown-env', executor: 'script', status: 'pending', depends_on: ['review'], always_run: true },
+  ],
+})
+
+async function actingHost(tools: Tools) {
+  vi.useFakeTimers()
+  const { betty, pesto, fetch } = bettyWithPesto(undefined, { pesto_dag_status: { text: RUNNING_RUN }, ...tools })
+  const host = await signedIn(betty, fetch)
+  const sent = (name: string) => pesto.toolCalls().filter((call) => call.body!.params!.name === name).map((call) => call.body!.params!.arguments)
+  return { host, pesto, sent }
+}
+
+describe('decisions', () => {
+  it('approves a step with the new budget and hint', async () => {
+    const { host, sent } = await actingHost({ pesto_task_approve: { text: 'approved' } })
+
+    const result = await host.harness.behavior.callRpc('approveStep', { taskId: 't-watch-ci', budgetUsd: 12, hint: 'Skip the flaky test.' })
+
+    expect(result).toBeNull()
+    expect(sent('pesto_task_approve')).toEqual([{ task_id: 't-watch-ci', cost_budget_usd: 12, hint: 'Skip the flaky test.' }])
+  })
+
+  it('denies a step with the reason', async () => {
+    const { host, sent } = await actingHost({ pesto_task_deny: { text: 'denied' } })
+
+    await host.harness.behavior.callRpc('denyStep', { taskId: 't-watch-ci', reason: '  Wrong approach.  ' })
+
+    expect(sent('pesto_task_deny')).toEqual([{ task_id: 't-watch-ci', reason: 'Wrong approach.' }])
+  })
+
+  it('refuses a deny without a reason and sends nothing', async () => {
+    const { host, pesto } = await actingHost({ pesto_task_deny: { text: 'denied' } })
+
+    await expect(host.harness.behavior.callRpc('denyStep', { taskId: 't-watch-ci', reason: '   ' })).rejects.toThrow()
+    expect(pesto.toolCalls()).toEqual([])
+  })
+
+  it('refuses an approval without a positive budget and sends nothing', async () => {
+    const { host, pesto } = await actingHost({ pesto_task_approve: { text: 'approved' } })
+
+    await expect(host.harness.behavior.callRpc('approveStep', { taskId: 't-watch-ci', budgetUsd: 0 })).rejects.toThrow()
+    expect(pesto.toolCalls()).toEqual([])
+  })
+
+  it('stops a run by stopping the live steps and denying the suspended ones, and leaves the rest to PESTO', async () => {
+    const { host, sent } = await actingHost({ pesto_task_stop: { text: 'stopped' }, pesto_task_deny: { text: 'denied' } })
+
+    const result = await host.harness.behavior.callRpc('stopRun', { runId: 'run-1' })
+
+    expect(sent('pesto_dag_status')).toEqual([{ run_id: 'run-1' }])
+    expect(sent('pesto_task_stop')).toEqual([{ task_id: 't-implement', reason: 'Stopped from bb.' }])
+    expect(sent('pesto_task_deny')).toEqual([{ task_id: 't-watch-ci', reason: 'Stopped from bb.' }])
+    expect(result).toEqual({ stopped: ['implement', 'watch-ci'], failed: [] })
+  })
+
+  it('reports a step that PESTO refuses to stop and still stops the others', async () => {
+    const { host } = await actingHost({
+      pesto_task_stop: { text: 'task t-implement already finished', isError: true },
+      pesto_task_deny: { text: 'denied' },
+    })
+
+    const result = await host.harness.behavior.callRpc('stopRun', { runId: 'run-1' })
+
+    expect(result).toEqual({ stopped: ['watch-ci'], failed: [{ step: 'implement', error: 'task t-implement already finished' }] })
   })
 })
