@@ -53,6 +53,11 @@ Change it with `bb plugin config betty set baseUrl https://...`.
 - Below each pull request is the list of steps that acted on it (review, remediation, CI watch). Click an entry to open its review or comment on GitHub. An entry that has not happened yet shows "planned".
 - The steps show in columns. A step's column is its longest path from a first step. Each step shows its status, its spend against its budget (or its executor when it has no budget), and when it runs.
 - The detail reads the run and its outcome again every 30 seconds.
+- A step that waits for a decision (`suspended`) gets a card. The card shows why the step stopped and what it spent against its budget.
+- "Approve" asks for a new budget and an optional hint. The budget starts at double the old budget. It must be more than the step spent, because PESTO refuses a lower budget.
+- "Deny" asks for a reason. A denied step does not run again.
+- "Stop run" shows when a step can still stop. It asks first. It stops the running and queued steps and denies the steps that wait for a decision, with the reason "Stopped from bb.". PESTO then cancels the steps that wait on them. `always_run` steps, for example the teardown, still run, and the question names them.
+- When PESTO refuses to stop a step, the detail shows the step and the reason.
 
 ## Status
 
