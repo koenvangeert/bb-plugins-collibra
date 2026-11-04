@@ -291,4 +291,14 @@ describe('MCP session', () => {
     expect(error.message).toContain(text)
     expect(error.message).not.toContain(TOKEN)
   })
+
+  it('refuses a plain text answer to a read as an unexpected answer', async () => {
+    const pesto = createFakePesto({ tools: { pesto_dag_status: { text: 'run r is busy' } } })
+    const { client } = connect(pesto)
+
+    const error = await caught(client.dagStatus('r'))
+
+    expect(error).toBeInstanceOf(PestoError)
+    expect(error.message).toContain('unexpected answer to pesto_dag_status')
+  })
 })
