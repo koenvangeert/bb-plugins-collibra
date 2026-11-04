@@ -1,6 +1,6 @@
 import type { ThreadRun } from '../runChip'
 // @vitest-environment jsdom
-import { cleanup, within } from '@testing-library/react'
+import { cleanup, fireEvent, within } from '@testing-library/react'
 import { act, type ComponentType } from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { loadPluginApp, renderSlot, type CapturedPluginApp } from '@get-bb/plugin-sdk/testing/app'
@@ -336,6 +336,139 @@ describe('BETTY run detail', () => {
   })
 })
 
+const DECISION_DETAIL: RunDetail = {
+  ...FIXTURE_DETAIL,
+  nodes: FIXTURE_DETAIL.nodes.map((node) => {
+    if (node.name === 'review-2') return { ...node, status: 'suspended', error: 'ci is red after 2 remediation attempt(s) (max 2)' }
+    if (node.name === 'publish-review' || node.name === 'teardown-env') return { ...node, status: 'pending' }
+    return node
+  }),
+}
+
+const REVIEW_2 = DECISION_DETAIL.nodes.find((node) => node.name === 'review-2')!
+
+function renderDecision(handlers: { approveStep?: () => null; denyStep?: () => null; stopRun?: () => { stopped: string[]; failed: { step: string; error: string }[] } } = {}) {
+  const runDetail = vi.fn(() => DECISION_DETAIL)
+  const approveStep = vi.fn(handlers.approveStep ?? (() => null))
+  const denyStep = vi.fn(handlers.denyStep ?? (() => null))
+  const stopRun = vi.fn(handlers.stopRun ?? (() => ({ stopped: ['review-2'], failed: [] })))
+  const slot = renderSlot(app.navPanels[0]!, { subPath: DECISION_DETAIL.runId }, {
+    rpc: {
+      authStatus: () => ({ state: 'signed-in' }),
+      startSignIn: () => ({ url: 'https://betty.test/oauth/authorize' }),
+      myRuns: () => myRuns(),
+      runDetail,
+      approveStep,
+      denyStep,
+      stopRun,
+    },
+  })
+  return { slot, runDetail, approveStep, denyStep, stopRun }
+}
+
+describe('BETTY decisions', () => {
+  it('shows why a step waits for a decision and what it spent', async () => {
+    const { slot } = renderDecision()
+
+    const card = await slot.findByRole('region', { name: 'Decide on review-2' })
+
+    expect(within(card).getByText('ci is red after 2 remediation attempt(s) (max 2)')).toBeTruthy()
+    expect(within(card).getByText('Spent $0.35 of $6.00')).toBeTruthy()
+  })
+
+  it('approves a step with double the old budget and a hint, then reads the run again', async () => {
+    const { slot, runDetail, approveStep } = renderDecision()
+    const card = await slot.findByRole('region', { name: 'Decide on review-2' })
+
+    await act(async () => within(card).getByRole('button', { name: 'Approve' }).click())
+    const form = within(card).getByRole('form', { name: 'Approve review-2' })
+    expect((within(form).getByLabelText('New budget (USD)') as HTMLInputElement).value).toBe('12')
+    await act(async () => fireEvent.change(within(form).getByLabelText('Hint (optional)'), { target: { value: 'Skip the flaky test.' } }))
+    const readsBefore = runDetail.mock.calls.length
+    await act(async () => within(form).getByRole('button', { name: 'Approve' }).click())
+
+    expect(approveStep).toHaveBeenCalledWith({ taskId: REVIEW_2.taskId, budgetUsd: 12, hint: 'Skip the flaky test.' })
+    expect(runDetail.mock.calls.length).toBeGreaterThan(readsBefore)
+    expect(within(card).queryByRole('form')).toBeNull()
+  })
+
+  it('does not approve a budget that is not above what the step spent', async () => {
+    const { slot, approveStep } = renderDecision()
+    const card = await slot.findByRole('region', { name: 'Decide on review-2' })
+
+    await act(async () => within(card).getByRole('button', { name: 'Approve' }).click())
+    const form = within(card).getByRole('form', { name: 'Approve review-2' })
+    await act(async () => fireEvent.change(within(form).getByLabelText('New budget (USD)'), { target: { value: '0.3' } }))
+
+    expect(within(form).getByText('The budget must be more than the $0.35 this step spent.')).toBeTruthy()
+    expect((within(form).getByRole('button', { name: 'Approve' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(approveStep).not.toHaveBeenCalled()
+  })
+
+  it('shows why BETTY refused the approval', async () => {
+    const { slot } = renderDecision({
+      approveStep: () => {
+        throw new Error('budget must exceed spend')
+      },
+    })
+    const card = await slot.findByRole('region', { name: 'Decide on review-2' })
+
+    await act(async () => within(card).getByRole('button', { name: 'Approve' }).click())
+    await act(async () => within(within(card).getByRole('form')).getByRole('button', { name: 'Approve' }).click())
+
+    expect((await within(card).findByRole('alert')).textContent).toContain('budget must exceed spend')
+  })
+
+  it('denies a step only with a reason', async () => {
+    const { slot, denyStep } = renderDecision()
+    const card = await slot.findByRole('region', { name: 'Decide on review-2' })
+
+    await act(async () => within(card).getByRole('button', { name: 'Deny' }).click())
+    const form = within(card).getByRole('form', { name: 'Deny review-2' })
+    const submit = within(form).getByRole('button', { name: 'Deny' }) as HTMLButtonElement
+    expect(submit.disabled).toBe(true)
+    await act(async () => fireEvent.change(within(form).getByLabelText('Reason'), { target: { value: 'Wrong approach.' } }))
+    await act(async () => submit.click())
+
+    expect(denyStep).toHaveBeenCalledWith({ taskId: REVIEW_2.taskId, reason: 'Wrong approach.' })
+  })
+
+  it('asks before it stops the run and names the steps that still run', async () => {
+    const { slot, stopRun } = renderDecision()
+
+    await act(async () => (await slot.findByRole('button', { name: 'Stop run' })).click())
+    const confirm = slot.getByRole('group', { name: 'Stop the run' })
+    expect(within(confirm).getByText('Stop 1 step? teardown-env still runs.')).toBeTruthy()
+    await act(async () => within(confirm).getByRole('button', { name: 'Cancel' }).click())
+
+    expect(stopRun).not.toHaveBeenCalled()
+    expect(slot.queryByRole('group', { name: 'Stop the run' })).toBeNull()
+
+    await act(async () => slot.getByRole('button', { name: 'Stop run' }).click())
+    await act(async () => within(slot.getByRole('group', { name: 'Stop the run' })).getByRole('button', { name: 'Stop run' }).click())
+
+    expect(stopRun).toHaveBeenCalledWith({ runId: DECISION_DETAIL.runId })
+  })
+
+  it('shows the steps that did not stop', async () => {
+    const { slot } = renderDecision({ stopRun: () => ({ stopped: [], failed: [{ step: 'review-2', error: 'task already finished' }] }) })
+
+    await act(async () => (await slot.findByRole('button', { name: 'Stop run' })).click())
+    await act(async () => within(slot.getByRole('group', { name: 'Stop the run' })).getByRole('button', { name: 'Stop run' }).click())
+
+    expect((await slot.findByRole('alert')).textContent).toBe('Could not stop 1 step:review-2: task already finished')
+  })
+
+  it('has no stop button on a finished run', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'))
+
+    await slot.findByRole('heading', { name: FIXTURE_DETAIL.runId })
+
+    expect(slot.queryByRole('button', { name: 'Stop run' })).toBeNull()
+    expect(slot.queryByRole('region', { name: /^Decide on/ })).toBeNull()
+  })
+})
+
 describe('BETTY run tab', () => {
   it('asks to sign in when signed out', async () => {
     const slot = renderSlot({ component: app.tabs[0]!.component as ComponentType<{ threadId: string }> }, { threadId: 'thr_1' }, {
@@ -358,6 +491,16 @@ describe('BETTY run tab', () => {
     expect(slot.getByRole('listitem', { name: 'remediate-review' }).textContent).toContain('$0.56/$12.00')
   })
 
+  it('lets you decide on a step and stop the run', async () => {
+    const slot = renderThreadTab({ kind: 'linked', runId: DECISION_DETAIL.runId, chip: null, pullRequests: [], error: null }, () => DECISION_DETAIL)
+
+    const card = await slot.findByRole('region', { name: 'Decide on review-2' })
+
+    expect(within(card).getByRole('button', { name: 'Approve' })).toBeTruthy()
+    expect(within(card).getByRole('button', { name: 'Deny' })).toBeTruthy()
+    expect(slot.getByRole('button', { name: 'Stop run' })).toBeTruthy()
+  })
+
   it('says when the thread has no run', async () => {
     const slot = renderThreadTab({ kind: 'none', ticketKey: null })
 
@@ -365,14 +508,14 @@ describe('BETTY run tab', () => {
   })
 })
 
-function renderThreadTab(threadRun: ThreadRun) {
+function renderThreadTab(threadRun: ThreadRun, runDetail: () => RunDetail = () => detailWithBase('release/1')) {
   return renderSlot({ component: app.tabs[0]!.component as ComponentType<{ threadId: string }> }, { threadId: 'thr_1' }, {
     rpc: {
       authStatus: () => ({ state: 'signed-in' }),
       startSignIn: () => ({ url: 'https://betty.test/oauth/authorize' }),
       myRuns: () => myRuns(),
       threadRun: () => threadRun,
-      runDetail: () => detailWithBase('release/1'),
+      runDetail,
     },
   })
 }
