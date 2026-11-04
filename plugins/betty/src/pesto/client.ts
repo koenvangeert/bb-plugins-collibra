@@ -22,6 +22,10 @@ export function createPestoClient(session: Pick<McpSession, 'callTool'>) {
     return reply.data
   }
 
+  async function act(tool: string, args: Record<string, unknown>): Promise<void> {
+    await call(tool, args, z.unknown())
+  }
+
   return {
     listRuns: (query: ListRunsQuery): Promise<RunList> =>
       call(
@@ -43,6 +47,10 @@ export function createPestoClient(session: Pick<McpSession, 'callTool'>) {
         artifactSchema,
       ),
     whoami: (): Promise<Identity> => call('pesto_whoami', {}, identitySchema),
+    approve: ({ taskId, budgetUsd, hint }: { taskId: string; budgetUsd: number; hint?: string }) =>
+      act('pesto_task_approve', { task_id: taskId, cost_budget_usd: budgetUsd, hint: hint?.trim() || undefined }),
+    deny: ({ taskId, reason }: { taskId: string; reason: string }) => act('pesto_task_deny', { task_id: taskId, reason }),
+    stop: ({ taskId, reason }: { taskId: string; reason: string }) => act('pesto_task_stop', { task_id: taskId, reason }),
   }
 }
 
