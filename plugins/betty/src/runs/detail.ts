@@ -39,7 +39,7 @@ export const STEP_STATUS_STYLE: Record<NodeStatus, StepStatusStyle> = {
   unknown: { label: 'Unknown', icon: 'CircleQuestion', text: 'text-muted-foreground', border: 'border-l-border', fill: 'bg-muted' },
 }
 
-const FINISHED: ReadonlySet<NodeStatus> = new Set(['succeeded', 'skipped', 'failed', 'cancelled'])
+export const FINISHED: ReadonlySet<NodeStatus> = new Set(['succeeded', 'skipped', 'failed', 'cancelled'])
 
 export function stepProgress(nodes: readonly RunNode[]): { done: number; total: number } {
   return { done: nodes.filter((node) => FINISHED.has(node.status)).length, total: nodes.length }
