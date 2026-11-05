@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createBettyAuth } from './src/auth/session'
 import { SIGN_IN_PROMPT } from './src/auth/state'
 import { createAuthStore, MIGRATIONS } from './src/auth/store'
+import { registerAgentTools } from './src/agentTools'
 import { createPestoClient } from './src/pesto/client'
 import { createMcpSession, PestoError } from './src/pesto/mcp'
 import { rpcContract } from './src/rpc'
@@ -58,11 +59,12 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
       return ownerEmail
     }
 
+    const isSignedIn = () => auth.state().kind === 'signed-in'
     const watcher = createRunWatcher({
       db,
       pesto,
       sdk: bb.sdk.threads,
-      isSignedIn: () => auth.state().kind === 'signed-in',
+      isSignedIn,
       log: (line) => bb.log.warn(line),
     })
     bb.background.service('run-watcher', { start: (signal) => watcher.run(signal) })
@@ -83,7 +85,8 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
         }
       },
     })
-    bb.agents.configure(() => ({ tools: [LINK_TOOL], skills: [] }))
+    const answerTools = registerAgentTools(bb.agents, { pesto, evidence, linkedRunId: runs.linkedRunId, isSignedIn })
+    bb.agents.configure(() => ({ tools: [LINK_TOOL, ...answerTools], skills: [] }))
 
     settings.onChange((next) => {
       if (next.baseUrl !== baseUrl) reload()
