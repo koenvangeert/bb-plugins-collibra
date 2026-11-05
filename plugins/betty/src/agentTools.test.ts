@@ -1,5 +1,5 @@
 import { createFakePluginHost, type FakePluginHost } from '@get-bb/plugin-sdk/testing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createPlugin } from '../server'
 import { createFakeBetty } from './auth/fakeBetty'
 import { createFakePesto, fixture } from './pesto/fakePesto'
@@ -17,44 +17,6 @@ const fixtureTools: Tools = {
   pesto_artifact_get: { text: fixture('artifact-result.json') },
   pesto_task_logs: { text: fixture('task-logs.json') },
 }
-
-async function start(tools: Tools = {}, metadata: Record<string, unknown> = { runId: RUN }) {
-  const betty = createFakeBetty()
-  const pesto = createFakePesto({ tools: { ...fixtureTools, ...tools } })
-  const fetch: typeof globalThis.fetch = (input, init) =>
-    new URL(String(input)).pathname === '/mcp' ? pesto.fetch(input, init) : betty.fetch(input, init)
-  const host = createFakePluginHost({
-    pluginId: 'betty',
-    settings: { baseUrl: betty.base },
-    sdk: { threads: { getPluginMetadata: async () => metadata }, plugins: { reload: async () => ({ ok: true }) } },
-  })
-  await createPlugin({ fetch })(host.bb)
-  const signIn = async () => {
-    const { url } = (await host.harness.behavior.callRpc('startSignIn', null)) as { url: string }
-    await host.harness.behavior.fetchHttp('GET', `/oauth/callback?${new URLSearchParams(betty.approve(url))}`)
-    await vi.advanceTimersByTimeAsync(0)
-  }
-  const reload = () => host.harness.lifecycle.reload(createPlugin({ fetch }))
-  return { host, signIn, reload }
-}
-
-async function signedIn(tools: Tools = {}, metadata?: Record<string, unknown>) {
-  const { signIn, reload } = await start(tools, metadata)
-  await signIn()
-  return reload()
-}
-
-async function call(host: FakePluginHost, tool: string, input: Record<string, unknown> = {}) {
-  const result = await host.harness.behavior.callAgentTool(tool, input, { threadId: THREAD })
-  if (typeof result === 'string') return { text: result, isError: false }
-  return { text: result.content.map((part) => ('text' in part ? part.text : '')).join(''), isError: result.isError === true }
-}
-
-const runJson = (nodes: object[]) => JSON.stringify({ run_id: 'huge', total_cost_usd: 99, nodes })
-
-beforeEach(() => {
-  vi.useFakeTimers()
-})
 
 afterEach(() => {
   vi.useRealTimers()
@@ -198,3 +160,38 @@ describe('betty_evidence', () => {
     expect(pages.join('')).toBe(content)
   })
 })
+
+async function start(tools: Tools = {}, metadata: Record<string, unknown> = { runId: RUN }) {
+  vi.useFakeTimers()
+  const betty = createFakeBetty()
+  const pesto = createFakePesto({ tools: { ...fixtureTools, ...tools } })
+  const fetch: typeof globalThis.fetch = (input, init) =>
+    new URL(String(input)).pathname === '/mcp' ? pesto.fetch(input, init) : betty.fetch(input, init)
+  const host = createFakePluginHost({
+    pluginId: 'betty',
+    settings: { baseUrl: betty.base },
+    sdk: { threads: { getPluginMetadata: async () => metadata }, plugins: { reload: async () => ({ ok: true }) } },
+  })
+  await createPlugin({ fetch })(host.bb)
+  const signIn = async () => {
+    const { url } = (await host.harness.behavior.callRpc('startSignIn', null)) as { url: string }
+    await host.harness.behavior.fetchHttp('GET', `/oauth/callback?${new URLSearchParams(betty.approve(url))}`)
+    await vi.advanceTimersByTimeAsync(0)
+  }
+  const reload = () => host.harness.lifecycle.reload(createPlugin({ fetch }))
+  return { host, signIn, reload }
+}
+
+async function signedIn(tools: Tools = {}, metadata?: Record<string, unknown>) {
+  const { signIn, reload } = await start(tools, metadata)
+  await signIn()
+  return reload()
+}
+
+async function call(host: FakePluginHost, tool: string, input: Record<string, unknown> = {}) {
+  const result = await host.harness.behavior.callAgentTool(tool, input, { threadId: THREAD })
+  if (typeof result === 'string') return { text: result, isError: false }
+  return { text: result.content.map((part) => ('text' in part ? part.text : '')).join(''), isError: result.isError === true }
+}
+
+const runJson = (nodes: object[]) => JSON.stringify({ run_id: 'huge', total_cost_usd: 99, nodes })
