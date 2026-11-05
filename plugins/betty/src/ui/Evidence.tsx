@@ -29,7 +29,7 @@ export function EvidenceSection({ runId }: { runId: string }) {
       {faked && (
         <p role="status" className={`m-0 flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${AMBER}`}>
           <Icon name="AlertTriangle" fallback="Circle" aria-hidden className="mt-0.5 size-4 shrink-0" />
-          <span>Some evidence comes from faked backend data, so those checks did not run against real data.</span>
+          <span>Some evidence mentions faked backend data. Read the marked criteria before you trust them.</span>
         </p>
       )}
       {query.data.map((step) => (

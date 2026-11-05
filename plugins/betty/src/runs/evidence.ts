@@ -19,7 +19,8 @@ const FAKED_BACKEND: readonly RegExp[] = [
   /simulated backend/i,
   /not real data/i,
   /magneto_playwright_route/i,
-  /\b(rewrote|rewritten|faked|fake|mocked|stubbed|intercepted)\b.*\bresponses?\b/i,
+  /page\.route|route\.fulfill/i,
+  /\b(rewrote|rewritten|rewrite|faked|fake|mocked|mock|stubbed|stub|intercepted|intercept|overrode|overridden|override)\b.*\b(responses?|endpoints?|api|calls?|requests?)\b/i,
 ]
 
 export function fakedBackendSentence(evidence: string): string | null {

@@ -413,13 +413,13 @@ describe('BETTY acceptance criteria', () => {
     expect(within(notMet).queryByRole('button')).toBeNull()
   })
 
-  it('says which evidence comes from faked backend data', async () => {
+  it('marks the criteria whose evidence mentions faked backend data', async () => {
     const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, { runEvidence: () => FAKED_EVIDENCE })
 
     const section = await slot.findByRole('region', { name: 'Acceptance criteria' })
 
     expect(within(section).getByRole('status').textContent).toBe(
-      'Some evidence comes from faked backend data, so those checks did not run against real data.',
+      'Some evidence mentions faked backend data. Read the marked criteria before you trust them.',
     )
     const faked = within(section).getByRole('listitem', { name: 'AC-1' })
     expect(within(faked).getByText('Faked backend data')).toBeTruthy()

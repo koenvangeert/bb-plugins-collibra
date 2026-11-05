@@ -31,7 +31,13 @@ describe('faked backend sentence', () => {
     ['simulated backend state', 'The tab rendered. This is simulated backend state. It looked right.', 'This is simulated backend state.'],
     ['data that is not real', 'Counts showed 4, which is not real data!', 'Counts showed 4, which is not real data!'],
     ['a mocked response', 'I mocked the contracts response to return two rules.', 'I mocked the contracts response to return two rules.'],
+    ['an intercepted call', 'I intercepted the guardianOverview call with a route handler.', 'I intercepted the guardianOverview call with a route handler.'],
+    ['a stubbed endpoint', 'stubbed the contracts endpoint', 'stubbed the contracts endpoint'],
+    ['a mocked API', 'mocked the API', 'mocked the API'],
+    ['a Playwright route', 'The flags came from page.route in the test.', 'The flags came from page.route in the test.'],
+    ['a fulfilled route', 'I served the rules with route.fulfill.', 'I served the rules with route.fulfill.'],
     ['a response without a faking verb', 'The flags response returned false.', null],
+    ['evidence without faking words', 'I opened the Guardian tab and saw two rules in the list.', null],
   ])('finds %s', (_name, evidence, sentence) => {
     expect(fakedBackendSentence(evidence!)).toBe(sentence)
   })
