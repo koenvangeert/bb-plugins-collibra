@@ -3,7 +3,7 @@ import {
   NODE_STATUSES,
   PULL_REQUEST_STATES,
   RUN_OUTCOMES,
-  type AcEvidence,
+  type AcVerdict,
   type Artifact,
   type ArtifactEntry,
   type Identity,
@@ -158,13 +158,13 @@ export const artifactSchema = z
   .object({ content: z.string(), note: z.string().optional() })
   .transform((artifact): Artifact => ({ content: artifact.content, note: artifact.note ?? null }))
 
-export const acEvidenceSchema = z
+const resultContent = z
   .string()
   .transform((content, ctx) => {
     try {
       return JSON.parse(content) as unknown
     } catch {
-      ctx.addIssue({ code: 'custom', message: 'not JSON' })
+      ctx.addIssue({ code: 'custom', message: 'the result artifact is not JSON' })
       return z.NEVER
     }
   })
@@ -174,17 +174,20 @@ export const acEvidenceSchema = z
         z.object({
           id: z.string(),
           met: z.boolean(),
-          evidence: z.string().default(''),
-          images: z.array(z.string()).default([]),
+          evidence: z
+            .string()
+            .nullish()
+            .transform((evidence) => evidence ?? ''),
+          images: z
+            .array(z.string())
+            .nullish()
+            .transform((images) => images ?? []),
         }),
       ),
     }),
   )
-  .transform(
-    (result): AcEvidence => ({
-      acs: result.acs.map(({ id, met, evidence, images }) => ({ id, met, evidence, images })),
-    }),
-  )
+
+export const acEvidenceSchema = z.object({ content: resultContent }).transform(({ content }): AcVerdict[] => content.acs)
 
 export const taskLogsSchema = z
   .object({
@@ -218,9 +221,21 @@ export const taskLogsSchema = z
       ),
   )
 
+const CRITERION_LINE = /^(AC-\d+):\s*(.+)$/
+
 export const taskShowSchema = z
-  .object({ acceptance_criteria_list: z.array(z.string()).default([]) })
-  .transform((task): TaskShow => ({ acceptanceCriteria: task.acceptance_criteria_list }))
+  .object({ required_artifacts: z.array(z.string()), acceptance_criteria: z.string().nullish() })
+  .transform(
+    (task): TaskShow => ({
+      requiredArtifacts: task.required_artifacts,
+      criteria: Object.fromEntries(
+        (task.acceptance_criteria ?? '').split('\n').flatMap((line) => {
+          const criterion = line.trim().match(CRITERION_LINE)
+          return criterion ? [[criterion[1]!, criterion[2]!]] : []
+        }),
+      ),
+    }),
+  )
 
 export const identitySchema = z
   .object({ email: z.string().optional() })

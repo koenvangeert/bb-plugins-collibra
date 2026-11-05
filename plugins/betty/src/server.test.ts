@@ -333,15 +333,17 @@ describe('evidence and artifacts', () => {
       const cut = args.artifact_id === 'short' ? { content: 'done' } : { content: 'x'.repeat(98_304), note: 'truncated: showing the first 98304 bytes of a gzipped artifact (1531592 bytes compressed).' }
       return { text: JSON.stringify({ artifact_id: args.artifact_id, kind: 'transcript', content_type: 'text/plain', size_bytes: 1531592, ...cut }) }
     }
-    if (args.task_id === VALIDATE_APP) return { text: fixture('artifact-result.json') }
-    return { text: `task ${String(args.task_id)} has no "result" artifact on any attempt; pesto_task_logs lists what it did produce`, isError: true }
+    return { text: fixture('artifact-result.json') }
   }
+
+  const taskShow = (args: Record<string, unknown>) =>
+    args.task_id === VALIDATE_APP ? { text: fixture('task-show-validate.json') } : { text: JSON.stringify({ required_artifacts: ['push_branch'] }) }
 
   async function evidenceHost() {
     vi.useFakeTimers()
     const { betty, pesto, fetch } = bettyWithPesto(undefined, {
       pesto_artifact_get: artifactGet,
-      pesto_task_show: { text: fixture('task-show-validate.json') },
+      pesto_task_show: taskShow,
       pesto_task_logs: { text: fixture('task-logs.json') },
     })
     const host = await signedIn(betty, fetch)
@@ -356,7 +358,7 @@ describe('evidence and artifacts', () => {
       step: string
       criteria: { id: string; text: string | null; met: boolean }[]
     }[]
-    const asked = sent('pesto_artifact_get').length
+    const shown = sent('pesto_task_show').length
     await host.harness.behavior.callRpc('runEvidence', { runId: 'central-frontend-team-browser-validated-f153a0' })
 
     expect(steps.map((step) => step.step)).toEqual(['validate-app'])
@@ -365,8 +367,8 @@ describe('evidence and artifacts', () => {
       ['AC-2', 'With AI Agent contracts off, the asset has no Contract tab', true],
       ['AC-3', null, true],
     ])
-    expect(sent('pesto_task_show')).toEqual([{ task_id: VALIDATE_APP }])
-    expect(sent('pesto_artifact_get')).toHaveLength(asked)
+    expect(sent('pesto_artifact_get')).toEqual([{ task_id: VALIDATE_APP, kind: 'result' }])
+    expect(sent('pesto_task_show')).toHaveLength(shown)
   })
 
   it('lists the artifacts of a step', async () => {

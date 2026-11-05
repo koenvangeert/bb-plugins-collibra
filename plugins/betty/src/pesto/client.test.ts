@@ -119,34 +119,33 @@ describe('PESTO client', () => {
       name: 'pesto_artifact_get',
       arguments: { task_id: '65bee160-b71b-4d19-a614-8ff73e1cc3b3', kind: 'result' },
     })
-    expect(evidence?.acs.map((ac) => [ac.id, ac.met])).toEqual([
+    expect(evidence.map((ac) => [ac.id, ac.met])).toEqual([
       ['AC-1', true],
       ['AC-2', true],
       ['AC-3', true],
     ])
-    expect(evidence?.acs[0]!.images).toEqual([
+    expect(evidence[0]!.images).toEqual([
       'https://github.com/collibra/frontend/raw/a9fb6c68e4baf54aee0c53004be3b2220db61d32/ac-image-AC-1-1-drawer-flag-off.png',
     ])
-    expect(evidence?.acs[0]!.evidence).toMatch(/^On the deployed DGC/)
+    expect(evidence[0]!.evidence).toMatch(/^On the deployed DGC/)
+  })
+
+  it('reads a criterion that has no evidence or images', async () => {
+    const content = JSON.stringify({ acs: [{ id: 'AC-1', met: false, evidence: null, images: null }] })
+    const pesto = createFakePesto({ tools: { pesto_artifact_get: { text: JSON.stringify({ artifact_id: 'a', content }) } } })
+    const { client } = connect(pesto)
+
+    expect(await client.acEvidence('t')).toEqual([{ id: 'AC-1', met: false, evidence: '', images: [] }])
   })
 
   it.each([
     ['a result of another shape', JSON.stringify({ conclusion: 'success', checks: [] })],
     ['a result that is not JSON', 'done'],
-  ])('reads no evidence from %s', async (_name, content) => {
-    const artifact = { artifact_id: 'a', kind: 'result', content_type: 'application/json', size_bytes: 1, content }
-    const pesto = createFakePesto({ tools: { pesto_artifact_get: { text: JSON.stringify(artifact) } } })
+  ])('rejects %s as evidence', async (_name, content) => {
+    const pesto = createFakePesto({ tools: { pesto_artifact_get: { text: JSON.stringify({ artifact_id: 'a', content }) } } })
     const { client } = connect(pesto)
 
-    expect(await client.acEvidence('t')).toBeNull()
-  })
-
-  it('reads no evidence from a step without a result artifact', async () => {
-    const text = 'task t has no "result" artifact on any attempt; pesto_task_logs lists what it did produce'
-    const pesto = createFakePesto({ tools: { pesto_artifact_get: { text, isError: true } } })
-    const { client } = connect(pesto)
-
-    expect(await client.acEvidence('t')).toBeNull()
+    await expect(client.acEvidence('t')).rejects.toThrow(PestoError)
   })
 
   it('passes on any other error while it reads the evidence', async () => {
@@ -188,18 +187,20 @@ describe('PESTO client', () => {
 
     expect(pesto.toolCalls()[0]!.body!.params).toEqual({ name: 'pesto_task_show', arguments: { task_id: 'ff3bc7e0-644a-47b0-895b-368497922af8' } })
     expect(task).toEqual({
-      acceptanceCriteria: [
-        'On an AI Agent asset with Guardian off, the tab bar has no Guardian tab',
-        'With AI Agent contracts off, the asset has no Contract tab',
-      ],
+      requiredArtifacts: ['post_review', 'result'],
+      criteria: {
+        'AC-1': 'On an AI Agent asset with Guardian off, the tab bar has no Guardian tab',
+        'AC-2': 'With AI Agent contracts off, the asset has no Contract tab',
+      },
     })
   })
 
   it('reads no acceptance criteria from a step without them', async () => {
-    const pesto = createFakePesto({ tools: { pesto_task_show: { text: JSON.stringify({ name: 'reconcile-ci' }) } } })
+    const reconcileCi = { name: 'reconcile-ci', required_artifacts: ['push_branch'], acceptance_criteria_list: null }
+    const pesto = createFakePesto({ tools: { pesto_task_show: { text: JSON.stringify(reconcileCi) } } })
     const { client } = connect(pesto)
 
-    expect((await client.taskShow('t')).acceptanceCriteria).toEqual([])
+    expect(await client.taskShow('t')).toEqual({ requiredArtifacts: ['push_branch'], criteria: {} })
   })
 
   it('reads an artifact by id', async () => {

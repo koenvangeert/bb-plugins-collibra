@@ -52,25 +52,27 @@ function node(name: string, overrides: Partial<RunNode> = {}): RunNode {
   }
 }
 
-const NO_RESULT = (taskId: unknown) => ({
-  text: `task ${String(taskId)} has no "result" artifact on any attempt; pesto_task_logs lists what it did produce`,
-  isError: true,
-})
+const TASKS: Record<string, unknown> = {
+  't-validate-app': JSON.parse(fixture('task-show-validate.json')),
+  't-revalidate-app': {
+    required_artifacts: ['post_review', 'result'],
+    acceptance_criteria: 'AC-3: The other menus keep their order\nAC-1: The Compliance group is in order',
+  },
+  't-implement': { required_artifacts: ['open_pr'], acceptance_criteria: 'AC-1: The Compliance group is in order' },
+  't-review': { required_artifacts: ['post_review', 'result'] },
+  't-reconcile-ci': { required_artifacts: ['push_branch'], acceptance_criteria_list: null },
+}
 
 const RESULTS: Record<string, () => { text: string; isError?: boolean }> = {
-  't-implement': () => ({
-    text: JSON.stringify({ artifact_id: 'r', kind: 'result', content_type: 'application/json', size_bytes: 1, content: '{"conclusion":"success","checks":[]}' }),
-  }),
   't-validate-app': () => ({ text: fixture('artifact-result-faked.json') }),
   't-revalidate-app': () => ({ text: fixture('artifact-result.json') }),
-  't-review': () => NO_RESULT('t-review'),
 }
 
 function loaderWith(results = RESULTS) {
   const pesto = createFakePesto({
     tools: {
-      pesto_artifact_get: (args) => results[String(args.task_id)]?.() ?? NO_RESULT(args.task_id),
-      pesto_task_show: () => ({ text: fixture('task-show-validate.json') }),
+      pesto_artifact_get: (args) => results[String(args.task_id)]!(),
+      pesto_task_show: (args) => ({ text: JSON.stringify(TASKS[String(args.task_id)]) }),
     },
   })
   const session = createMcpSession({ endpoint: () => 'https://betty.test/mcp', getToken: async () => 'token', fetch: pesto.fetch })
@@ -87,13 +89,14 @@ const RUN: RunNode[] = [
   node('validate-app', { dependsOn: ['implement'] }),
   node('implement'),
   node('review', { dependsOn: ['implement'] }),
+  node('reconcile-ci', { dependsOn: ['implement'] }),
   node('build-frontend', { executor: 'script' }),
   node('remediate-app', { status: 'running', completedAt: undefined }),
   node('remediate-review', { status: 'skipped' }),
 ]
 
 describe('evidence loader', () => {
-  it('keeps the steps whose result holds AC evidence, in DAG order, with the AC text', async () => {
+  it('keeps the steps that must prove acceptance criteria in a result, in DAG order, with the AC text by id', async () => {
     const { loader } = loaderWith()
 
     const steps = await loader.load(RUN)
@@ -120,24 +123,24 @@ describe('evidence loader', () => {
         fakedBackend: null,
       },
     ])
-    expect(steps[1]!.criteria.map((criterion) => criterion.text)).toEqual([
-      'On an AI Agent asset with Guardian off, the tab bar has no Guardian tab',
-      'With AI Agent contracts off, the asset has no Contract tab',
-      null,
+    expect(steps[1]!.criteria.map((criterion) => [criterion.id, criterion.text])).toEqual([
+      ['AC-1', 'The Compliance group is in order'],
+      ['AC-2', null],
+      ['AC-3', 'The other menus keep their order'],
     ])
   })
 
-  it('asks only finished agent steps for evidence', async () => {
+  it('reads the result only of finished agent steps that require one and have criteria', async () => {
     const { loader, asked } = loaderWith()
 
     await loader.load(RUN)
 
-    expect(asked('pesto_artifact_get').sort()).toEqual(['t-implement', 't-revalidate-app', 't-review', 't-validate-app'])
-    expect(asked('pesto_task_show').sort()).toEqual(['t-revalidate-app', 't-validate-app'])
+    expect(asked('pesto_task_show').sort()).toEqual(['t-implement', 't-reconcile-ci', 't-revalidate-app', 't-review', 't-validate-app'])
+    expect(asked('pesto_artifact_get').sort()).toEqual(['t-revalidate-app', 't-validate-app'])
   })
 
-  it('passes on an error that is not a missing result', async () => {
-    const { loader } = loaderWith({ ...RESULTS, 't-review': () => ({ text: 'BETTY is down', isError: true }) })
+  it('passes on an error while it reads a result', async () => {
+    const { loader } = loaderWith({ ...RESULTS, 't-validate-app': () => ({ text: 'BETTY is down', isError: true }) })
 
     await expect(loader.load(RUN)).rejects.toThrow('BETTY is down')
   })
@@ -149,8 +152,8 @@ describe('evidence loader', () => {
     const second = await loader.load(RUN)
 
     expect(second).toEqual(first)
-    expect(asked('pesto_artifact_get')).toHaveLength(4)
-    expect(asked('pesto_task_show')).toHaveLength(2)
+    expect(asked('pesto_task_show')).toHaveLength(5)
+    expect(asked('pesto_artifact_get')).toHaveLength(2)
   })
 
   it('asks again for a step that finished again after a retry', async () => {
@@ -160,17 +163,20 @@ describe('evidence loader', () => {
     await loader.load(RUN.map((step) => (step.name === 'validate-app' ? { ...step, completedAt: '2026-10-28T16:00:00Z' } : step)))
 
     expect(asked('pesto_artifact_get').filter((taskId) => taskId === 't-validate-app')).toHaveLength(2)
-    expect(asked('pesto_artifact_get')).toHaveLength(5)
+    expect(asked('pesto_artifact_get')).toHaveLength(3)
   })
 
   it('asks again after a failed read', async () => {
     let down = true
-    const { loader, asked } = loaderWith({ ...RESULTS, 't-review': () => (down ? { text: 'BETTY is down', isError: true } : NO_RESULT('t-review')) })
+    const { loader, asked } = loaderWith({
+      ...RESULTS,
+      't-validate-app': () => (down ? { text: 'BETTY is down', isError: true } : { text: fixture('artifact-result-faked.json') }),
+    })
     await expect(loader.load(RUN)).rejects.toThrow('BETTY is down')
 
     down = false
 
     await expect(loader.load(RUN)).resolves.toHaveLength(2)
-    expect(asked('pesto_artifact_get').filter((taskId) => taskId === 't-review')).toHaveLength(2)
+    expect(asked('pesto_artifact_get').filter((taskId) => taskId === 't-validate-app')).toHaveLength(2)
   })
 })

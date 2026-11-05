@@ -1,5 +1,5 @@
 import type { PestoClient } from '../pesto/client'
-import type { AcEvidence, NodeStatus, RunNode } from '../pesto/types'
+import type { NodeStatus, RunNode } from '../pesto/types'
 import { dagColumns } from './detail'
 
 export type Criterion = {
@@ -31,10 +31,18 @@ export function createEvidenceLoader(pesto: Pick<PestoClient, 'acEvidence' | 'ta
   const finished = new Map<string, Promise<StepEvidence | null>>()
 
   async function read(node: RunNode): Promise<StepEvidence | null> {
-    const evidence = await pesto.acEvidence(node.taskId)
-    if (!evidence) return null
-    const { acceptanceCriteria } = await pesto.taskShow(node.taskId)
-    return { taskId: node.taskId, step: node.name, criteria: criteria(evidence, acceptanceCriteria) }
+    const task = await pesto.taskShow(node.taskId)
+    if (!task.requiredArtifacts.includes('result') || Object.keys(task.criteria).length === 0) return null
+    const verdicts = await pesto.acEvidence(node.taskId)
+    return {
+      taskId: node.taskId,
+      step: node.name,
+      criteria: verdicts.map((verdict) => ({
+        ...verdict,
+        text: task.criteria[verdict.id] ?? null,
+        fakedBackend: fakedBackendSentence(verdict.evidence),
+      })),
+    }
   }
 
   function cached(node: RunNode): Promise<StepEvidence | null> {
@@ -57,20 +65,4 @@ export function createEvidenceLoader(pesto: Pick<PestoClient, 'acEvidence' | 'ta
       return steps.filter((step): step is StepEvidence => step !== null)
     },
   }
-}
-
-function criteria(evidence: AcEvidence, texts: readonly string[]): Criterion[] {
-  return evidence.acs.map((ac) => ({
-    id: ac.id,
-    text: texts[criterionIndex(ac.id)] ?? null,
-    met: ac.met,
-    evidence: ac.evidence,
-    images: ac.images,
-    fakedBackend: fakedBackendSentence(ac.evidence),
-  }))
-}
-
-function criterionIndex(id: string): number {
-  const number = id.match(/^AC-(\d+)$/)?.[1]
-  return number === undefined ? -1 : Number(number) - 1
 }
