@@ -109,25 +109,107 @@ describe('PESTO client', () => {
     expect(detail.nodes[0]).not.toHaveProperty('error')
   })
 
-  it('reads an artifact by task and kind', async () => {
+  it('reads the acceptance criteria evidence from the result artifact of a step', async () => {
     const pesto = createFakePesto({ tools: fixtureTools })
     const { client } = connect(pesto)
 
-    const artifact = await client.artifact({ taskId: '65bee160-b71b-4d19-a614-8ff73e1cc3b3', kind: 'result' })
+    const evidence = await client.acEvidence('65bee160-b71b-4d19-a614-8ff73e1cc3b3')
 
     expect(pesto.toolCalls()[0]!.body!.params).toEqual({
       name: 'pesto_artifact_get',
       arguments: { task_id: '65bee160-b71b-4d19-a614-8ff73e1cc3b3', kind: 'result' },
     })
-    expect(artifact).toMatchObject({ artifactId: '5cf02d70-730c-4a4d-8668-cc0f752ad3b6', kind: 'result', sizeBytes: 2263 })
-    expect(JSON.parse(artifact.content).all_met).toBe(true)
+    expect(evidence?.allMet).toBe(true)
+    expect(evidence?.acs.map((ac) => [ac.id, ac.met])).toEqual([
+      ['AC-1', true],
+      ['AC-2', true],
+      ['AC-3', true],
+    ])
+    expect(evidence?.acs[0]!.images).toEqual([
+      'https://github.com/collibra/frontend/raw/a9fb6c68e4baf54aee0c53004be3b2220db61d32/ac-image-AC-1-1-drawer-flag-off.png',
+    ])
+    expect(evidence?.acs[0]!.evidence).toMatch(/^On the deployed DGC/)
+  })
+
+  it.each([
+    ['a result of another shape', JSON.stringify({ conclusion: 'success', checks: [] })],
+    ['a result that is not JSON', 'done'],
+  ])('reads no evidence from %s', async (_name, content) => {
+    const artifact = { artifact_id: 'a', kind: 'result', content_type: 'application/json', size_bytes: 1, content }
+    const pesto = createFakePesto({ tools: { pesto_artifact_get: { text: JSON.stringify(artifact) } } })
+    const { client } = connect(pesto)
+
+    expect(await client.acEvidence('t')).toBeNull()
+  })
+
+  it('reads no evidence from a step without a result artifact', async () => {
+    const text = 'task t has no "result" artifact on any attempt; pesto_task_logs lists what it did produce'
+    const pesto = createFakePesto({ tools: { pesto_artifact_get: { text, isError: true } } })
+    const { client } = connect(pesto)
+
+    expect(await client.acEvidence('t')).toBeNull()
+  })
+
+  it('passes on any other error while it reads the evidence', async () => {
+    const pesto = createFakePesto({ tools: { pesto_artifact_get: { text: 'task t not found', isError: true } } })
+    const { client } = connect(pesto)
+
+    await expect(client.acEvidence('t')).rejects.toThrow('task t not found')
+  })
+
+  it('lists the artifacts of a step, newest attempt first', async () => {
+    const logs = JSON.parse(fixture('task-logs.json'))
+    logs.attempts.push({ attempt: 2, status: 'succeeded', artifacts: [{ artifact_id: 'r2', kind: 'result', content_type: 'application/json', size_bytes: 10 }] })
+    const pesto = createFakePesto({ tools: { pesto_task_logs: { text: JSON.stringify(logs) } } })
+    const { client } = connect(pesto)
+
+    const artifacts = await client.taskLogs('ff3bc7e0-644a-47b0-895b-368497922af8')
+
+    expect(pesto.toolCalls()[0]!.body!.params).toEqual({ name: 'pesto_task_logs', arguments: { task_id: 'ff3bc7e0-644a-47b0-895b-368497922af8' } })
+    expect(artifacts.map((artifact) => [artifact.attempt, artifact.kind])).toEqual([
+      [2, 'result'],
+      [1, 'post_review'],
+      [1, 'result'],
+      [1, 'transcript'],
+      [1, 'usage_ledger'],
+    ])
+    expect(artifacts[3]).toEqual({
+      artifactId: 'f6cf7bf4-a16f-4589-9cc5-59d4636a4323',
+      kind: 'transcript',
+      contentType: 'application/gzip',
+      sizeBytes: 1531592,
+      attempt: 1,
+    })
+  })
+
+  it('reads the acceptance criteria of a step', async () => {
+    const pesto = createFakePesto({ tools: { pesto_task_show: { text: fixture('task-show-validate.json') } } })
+    const { client } = connect(pesto)
+
+    const task = await client.taskShow('ff3bc7e0-644a-47b0-895b-368497922af8')
+
+    expect(pesto.toolCalls()[0]!.body!.params).toEqual({ name: 'pesto_task_show', arguments: { task_id: 'ff3bc7e0-644a-47b0-895b-368497922af8' } })
+    expect(task).toEqual({
+      name: 'validate-app',
+      acceptanceCriteria: [
+        'On an AI Agent asset with Guardian off, the tab bar has no Guardian tab',
+        'With AI Agent contracts off, the asset has no Contract tab',
+      ],
+    })
+  })
+
+  it('reads no acceptance criteria from a step without them', async () => {
+    const pesto = createFakePesto({ tools: { pesto_task_show: { text: JSON.stringify({ name: 'reconcile-ci' }) } } })
+    const { client } = connect(pesto)
+
+    expect((await client.taskShow('t')).acceptanceCriteria).toEqual([])
   })
 
   it('reads an artifact by id', async () => {
     const pesto = createFakePesto({ tools: fixtureTools })
     const { client } = connect(pesto)
 
-    await client.artifact({ artifactId: '5cf02d70-730c-4a4d-8668-cc0f752ad3b6' })
+    await client.artifact('5cf02d70-730c-4a4d-8668-cc0f752ad3b6')
 
     expect(pesto.toolCalls()[0]!.body!.params!.arguments).toEqual({ artifact_id: '5cf02d70-730c-4a4d-8668-cc0f752ad3b6' })
   })
@@ -204,7 +286,7 @@ describe('MCP session', () => {
 
     await client.listRuns({ ownerDev: 'a@b.c' })
     await client.dagStatus('r')
-    await client.artifact({ artifactId: 'x' })
+    await client.artifact('x')
 
     expect(pesto.initializes()).toHaveLength(1)
     expect(pesto.toolCalls().map((call) => call.headers['mcp-session-id'])).toEqual(['session-1', 'session-1', 'session-1'])

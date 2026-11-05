@@ -85,4 +85,12 @@ export type Artifact = {
   content: string
 }
 
+export type AcVerdict = { id: string; met: boolean; evidence: string; images: string[] }
+
+export type AcEvidence = { allMet: boolean; acs: AcVerdict[] }
+
+export type ArtifactEntry = { artifactId: string; kind: string; contentType: string; sizeBytes: number; attempt: number }
+
+export type TaskShow = { name: string; acceptanceCriteria: string[] }
+
 export type Identity = { email: string | null }

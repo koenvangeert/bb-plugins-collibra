@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { PestoError, type McpSession } from './mcp'
-import type { Artifact, Identity, RunDetail, RunList } from './types'
-import { artifactSchema, identitySchema, runDetailSchema, runListSchema } from './wire'
+import type { AcEvidence, Artifact, ArtifactEntry, Identity, RunDetail, RunList, TaskShow } from './types'
+import { acEvidenceSchema, artifactSchema, identitySchema, runDetailSchema, runListSchema, taskLogsSchema, taskShowSchema } from './wire'
 
 export type ListRunsQuery = {
   ownerDev: string
@@ -11,7 +11,7 @@ export type ListRunsQuery = {
   offset?: number
 }
 
-export type ArtifactQuery = { taskId: string; kind: string } | { artifactId: string }
+const NO_RESULT_ARTIFACT = /has no "result" artifact on any attempt/
 
 export type PestoClient = ReturnType<typeof createPestoClient>
 
@@ -40,12 +40,18 @@ export function createPestoClient(session: Pick<McpSession, 'callTool'>) {
         runListSchema,
       ),
     dagStatus: (runId: string): Promise<RunDetail> => call('pesto_dag_status', { run_id: runId }, runDetailSchema),
-    artifact: (query: ArtifactQuery): Promise<Artifact> =>
-      call(
-        'pesto_artifact_get',
-        'artifactId' in query ? { artifact_id: query.artifactId } : { task_id: query.taskId, kind: query.kind },
-        artifactSchema,
-      ),
+    artifact: (artifactId: string): Promise<Artifact> => call('pesto_artifact_get', { artifact_id: artifactId }, artifactSchema),
+    acEvidence: async (taskId: string): Promise<AcEvidence | null> => {
+      try {
+        const result = await call('pesto_artifact_get', { task_id: taskId, kind: 'result' }, artifactSchema)
+        return acEvidenceSchema.safeParse(result.content).data ?? null
+      } catch (error) {
+        if (error instanceof PestoError && NO_RESULT_ARTIFACT.test(error.message)) return null
+        throw error
+      }
+    },
+    taskLogs: (taskId: string): Promise<ArtifactEntry[]> => call('pesto_task_logs', { task_id: taskId }, taskLogsSchema),
+    taskShow: (taskId: string): Promise<TaskShow> => call('pesto_task_show', { task_id: taskId }, taskShowSchema),
     whoami: (): Promise<Identity> => call('pesto_whoami', {}, identitySchema),
     approve: ({ taskId, budgetUsd, hint }: { taskId: string; budgetUsd: number; hint?: string }) =>
       act('pesto_task_approve', { task_id: taskId, cost_budget_usd: budgetUsd, hint: hint || undefined }),
