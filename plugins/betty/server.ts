@@ -118,10 +118,7 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
       },
       runEvidence: async ({ runId }) => evidence.load((await pesto.dagStatus(runId)).nodes),
       stepArtifacts: ({ taskId }) => pesto.taskLogs(taskId),
-      artifact: async ({ artifactId }) => {
-        const { kind, contentType, sizeBytes, content, note } = await pesto.artifact(artifactId)
-        return { kind, contentType, sizeBytes, content, note }
-      },
+      artifact: ({ artifactId }) => pesto.artifact(artifactId),
     })
 
     bb.http.route(

@@ -155,24 +155,8 @@ export const runDetailSchema = z
   )
 
 export const artifactSchema = z
-  .object({
-    artifact_id: z.string(),
-    kind: z.string(),
-    content_type: z.string(),
-    size_bytes: z.number(),
-    content: z.string(),
-    note: z.string().optional(),
-  })
-  .transform(
-    (artifact): Artifact => ({
-      artifactId: artifact.artifact_id,
-      kind: artifact.kind,
-      contentType: artifact.content_type,
-      sizeBytes: artifact.size_bytes,
-      content: artifact.content,
-      note: artifact.note ?? null,
-    }),
-  )
+  .object({ content: z.string(), note: z.string().optional() })
+  .transform((artifact): Artifact => ({ content: artifact.content, note: artifact.note ?? null }))
 
 export const acEvidenceSchema = z
   .string()
@@ -186,7 +170,6 @@ export const acEvidenceSchema = z
   })
   .pipe(
     z.object({
-      all_met: z.boolean(),
       acs: z.array(
         z.object({
           id: z.string(),
@@ -199,7 +182,6 @@ export const acEvidenceSchema = z
   )
   .transform(
     (result): AcEvidence => ({
-      allMet: result.all_met,
       acs: result.acs.map(({ id, met, evidence, images }) => ({ id, met, evidence, images })),
     }),
   )
@@ -215,7 +197,6 @@ export const taskLogsSchema = z
               z.object({
                 artifact_id: z.string(),
                 kind: z.string(),
-                content_type: z.string().default(''),
                 size_bytes: z.number().default(0),
               }),
             )
@@ -231,7 +212,6 @@ export const taskLogsSchema = z
         artifacts.map((artifact) => ({
           artifactId: artifact.artifact_id,
           kind: artifact.kind,
-          contentType: artifact.content_type,
           sizeBytes: artifact.size_bytes,
           attempt,
         })),
@@ -239,8 +219,8 @@ export const taskLogsSchema = z
   )
 
 export const taskShowSchema = z
-  .object({ name: z.string(), acceptance_criteria_list: z.array(z.string()).default([]) })
-  .transform((task): TaskShow => ({ name: task.name, acceptanceCriteria: task.acceptance_criteria_list }))
+  .object({ acceptance_criteria_list: z.array(z.string()).default([]) })
+  .transform((task): TaskShow => ({ acceptanceCriteria: task.acceptance_criteria_list }))
 
 export const identitySchema = z
   .object({ email: z.string().optional() })

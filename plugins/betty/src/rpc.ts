@@ -5,6 +5,7 @@ import {
   NODE_STATUSES,
   PULL_REQUEST_STATES,
   RUN_OUTCOMES,
+  type Artifact,
   type ArtifactEntry,
   type PullRequest,
   type RunDetail,
@@ -89,7 +90,6 @@ const stopResult = z.object({
 const stepEvidence = z.object({
   taskId: z.string(),
   step: z.string(),
-  allMet: z.boolean(),
   criteria: z.array(
     z.object({
       id: z.string(),
@@ -105,18 +105,14 @@ const stepEvidence = z.object({
 const artifactEntry = z.object({
   artifactId: z.string(),
   kind: z.string(),
-  contentType: z.string(),
   sizeBytes: z.number(),
   attempt: z.number(),
 }) satisfies z.ZodType<ArtifactEntry>
 
 const artifactContent = z.object({
-  kind: z.string(),
-  contentType: z.string(),
-  sizeBytes: z.number(),
   content: z.string(),
   note: z.string().nullable(),
-})
+}) satisfies z.ZodType<Artifact>
 
 export const rpcContract = defineRpcContract({
   authStatus: { input: z.null(), output: z.object({ state: z.enum(AUTH_KINDS) }) },

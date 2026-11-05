@@ -11,7 +11,7 @@ export type Criterion = {
   fakedBackend: string | null
 }
 
-export type StepEvidence = { taskId: string; step: string; allMet: boolean; criteria: Criterion[] }
+export type StepEvidence = { taskId: string; step: string; criteria: Criterion[] }
 
 const FAKED_BACKEND: readonly RegExp[] = [
   /simulated backend/i,
@@ -34,7 +34,7 @@ export function createEvidenceLoader(pesto: Pick<PestoClient, 'acEvidence' | 'ta
     const evidence = await pesto.acEvidence(node.taskId)
     if (!evidence) return null
     const { acceptanceCriteria } = await pesto.taskShow(node.taskId)
-    return { taskId: node.taskId, step: node.name, allMet: evidence.allMet, criteria: criteria(evidence, acceptanceCriteria) }
+    return { taskId: node.taskId, step: node.name, criteria: criteria(evidence, acceptanceCriteria) }
   }
 
   function cached(node: RunNode): Promise<StepEvidence | null> {

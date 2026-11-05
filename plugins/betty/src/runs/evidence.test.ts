@@ -98,10 +98,7 @@ describe('evidence loader', () => {
 
     const steps = await loader.load(RUN)
 
-    expect(steps.map((step) => [step.step, step.allMet])).toEqual([
-      ['validate-app', false],
-      ['revalidate-app', true],
-    ])
+    expect(steps.map((step) => step.step)).toEqual(['validate-app', 'revalidate-app'])
     expect(steps[0]!.criteria).toEqual([
       {
         id: 'AC-1',

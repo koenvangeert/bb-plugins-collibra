@@ -381,16 +381,16 @@ describe('evidence and artifacts', () => {
   it('passes on the note PESTO sends when it cut an artifact', async () => {
     const { host, sent } = await evidenceHost()
 
-    const artifact = (await host.harness.behavior.callRpc('artifact', { artifactId: 'f6cf7bf4' })) as { content: string }
+    const artifact = (await host.harness.behavior.callRpc('artifact', { artifactId: 'f6cf7bf4' })) as { content: string; note: string | null }
 
     expect(sent('pesto_artifact_get')).toEqual([{ artifact_id: 'f6cf7bf4' }])
-    expect(artifact).toMatchObject({ kind: 'transcript', contentType: 'text/plain', sizeBytes: 1531592, note: 'truncated: showing the first 98304 bytes of a gzipped artifact (1531592 bytes compressed).' })
+    expect(artifact.note).toBe('truncated: showing the first 98304 bytes of a gzipped artifact (1531592 bytes compressed).')
     expect(artifact.content).toHaveLength(98_304)
   })
 
   it('sends a short artifact whole', async () => {
     const { host } = await evidenceHost()
 
-    expect(await host.harness.behavior.callRpc('artifact', { artifactId: 'short' })).toMatchObject({ content: 'done', note: null })
+    expect(await host.harness.behavior.callRpc('artifact', { artifactId: 'short' })).toEqual({ content: 'done', note: null })
   })
 })

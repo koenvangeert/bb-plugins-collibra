@@ -77,21 +77,14 @@ export type RunDetail = {
   pullRequests: PullRequest[]
 }
 
-export type Artifact = {
-  artifactId: string
-  kind: string
-  contentType: string
-  sizeBytes: number
-  content: string
-  note: string | null
-}
+export type Artifact = { content: string; note: string | null }
 
 export type AcVerdict = { id: string; met: boolean; evidence: string; images: string[] }
 
-export type AcEvidence = { allMet: boolean; acs: AcVerdict[] }
+export type AcEvidence = { acs: AcVerdict[] }
 
-export type ArtifactEntry = { artifactId: string; kind: string; contentType: string; sizeBytes: number; attempt: number }
+export type ArtifactEntry = { artifactId: string; kind: string; sizeBytes: number; attempt: number }
 
-export type TaskShow = { name: string; acceptanceCriteria: string[] }
+export type TaskShow = { acceptanceCriteria: string[] }
 
 export type Identity = { email: string | null }

@@ -119,7 +119,6 @@ describe('PESTO client', () => {
       name: 'pesto_artifact_get',
       arguments: { task_id: '65bee160-b71b-4d19-a614-8ff73e1cc3b3', kind: 'result' },
     })
-    expect(evidence?.allMet).toBe(true)
     expect(evidence?.acs.map((ac) => [ac.id, ac.met])).toEqual([
       ['AC-1', true],
       ['AC-2', true],
@@ -176,7 +175,6 @@ describe('PESTO client', () => {
     expect(artifacts[3]).toEqual({
       artifactId: 'f6cf7bf4-a16f-4589-9cc5-59d4636a4323',
       kind: 'transcript',
-      contentType: 'application/gzip',
       sizeBytes: 1531592,
       attempt: 1,
     })
@@ -190,7 +188,6 @@ describe('PESTO client', () => {
 
     expect(pesto.toolCalls()[0]!.body!.params).toEqual({ name: 'pesto_task_show', arguments: { task_id: 'ff3bc7e0-644a-47b0-895b-368497922af8' } })
     expect(task).toEqual({
-      name: 'validate-app',
       acceptanceCriteria: [
         'On an AI Agent asset with Guardian off, the tab bar has no Guardian tab',
         'With AI Agent contracts off, the asset has no Contract tab',

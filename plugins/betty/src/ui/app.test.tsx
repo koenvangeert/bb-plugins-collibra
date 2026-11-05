@@ -361,7 +361,6 @@ const CLEAN_EVIDENCE: StepEvidence[] = [
   {
     taskId: 't-validate-app',
     step: 'validate-app',
-    allMet: false,
     criteria: [
       {
         id: 'AC-1',
@@ -474,13 +473,13 @@ describe('BETTY acceptance criteria', () => {
 
 describe('BETTY step artifacts', () => {
   const ARTIFACTS = [
-    { artifactId: 'a-review', kind: 'post_review', contentType: 'text/plain', sizeBytes: 76, attempt: 1 },
-    { artifactId: 'a-transcript', kind: 'transcript', contentType: 'application/gzip', sizeBytes: 1531592, attempt: 1 },
+    { artifactId: 'a-review', kind: 'post_review', sizeBytes: 76, attempt: 1 },
+    { artifactId: 'a-transcript', kind: 'transcript', sizeBytes: 1531592, attempt: 1 },
   ]
 
   function renderArtifacts(content: { content: string; note: string | null }) {
     const stepArtifacts = vi.fn(() => ARTIFACTS)
-    const artifact = vi.fn(() => ({ kind: 'post_review', contentType: 'text/plain', sizeBytes: 76, ...content }))
+    const artifact = vi.fn(() => content)
     const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, { stepArtifacts, artifact })
     return { slot, stepArtifacts, artifact }
   }
