@@ -84,7 +84,13 @@ function CriterionItem({ criterion }: { criterion: Criterion }) {
       {criterion.images.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {criterion.images.map((url, index) => (
-            <button key={url} type="button" className={`flex items-center gap-1.5 ${BUTTON}`} onClick={() => navigate.openUrl(url)}>
+            <button
+              key={url}
+              type="button"
+              aria-label={`${criterion.id} screenshot ${index + 1}`}
+              className={`flex items-center gap-1.5 ${BUTTON}`}
+              onClick={() => navigate.openUrl(url)}
+            >
               <Icon name="Image" fallback="ExternalLink" aria-hidden className="size-3.5" />
               Screenshot {index + 1}
             </button>
@@ -95,11 +101,17 @@ function CriterionItem({ criterion }: { criterion: Criterion }) {
   )
 }
 
-export function StepArtifacts({ taskId }: { taskId: string }) {
+export function StepArtifacts({ taskId, stepName }: { taskId: string; stepName: string }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="flex flex-col gap-1.5">
-      <button type="button" aria-expanded={open} className={`self-start ${BUTTON}`} onClick={() => setOpen(!open)}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={`Artifacts of ${stepName}`}
+        className={`self-start ${BUTTON}`}
+        onClick={() => setOpen(!open)}
+      >
         Artifacts
       </button>
       {open && <ArtifactList taskId={taskId} />}
@@ -109,12 +121,14 @@ export function StepArtifacts({ taskId }: { taskId: string }) {
 
 function ArtifactList({ taskId }: { taskId: string }) {
   const query = experimental_useRpcQuery({ contract: rpcContract, method: 'stepArtifacts', input: { taskId } })
+  useRefresh(query.refetch)
   const [shown, setShown] = useState<string | null>(null)
 
   if (query.error) return <p role="alert" className="m-0 text-xs text-destructive">{query.error.message}</p>
   if (!query.data) return <p className="m-0 text-xs text-muted-foreground">Loading the artifacts.</p>
   if (query.data.length === 0) return <p className="m-0 text-xs text-muted-foreground">No artifacts.</p>
 
+  const retried = new Set(query.data.map((artifact) => artifact.attempt)).size > 1
   return (
     <ul aria-label="Artifacts" className="m-0 flex list-none flex-col gap-1.5 p-0">
       {query.data.map((artifact) => (
@@ -125,7 +139,7 @@ function ArtifactList({ taskId }: { taskId: string }) {
             className={`self-start ${BUTTON}`}
             onClick={() => setShown(shown === artifact.artifactId ? null : artifact.artifactId)}
           >
-            {artifact.kind} · {bytes(artifact.sizeBytes)}
+            {[artifact.kind, ...(retried ? [`attempt ${artifact.attempt}`] : []), bytes(artifact.sizeBytes)].join(' · ')}
           </button>
           {shown === artifact.artifactId && <ArtifactViewer artifactId={artifact.artifactId} />}
         </li>

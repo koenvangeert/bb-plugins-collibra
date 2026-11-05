@@ -504,7 +504,7 @@ function StepCard({ node, showCondition }: { node: RunNode; showCondition: boole
       </div>
       {node.budgetUsd !== null && <StepSpend costUsd={node.costUsd} budgetUsd={node.budgetUsd} />}
       {showCondition && <StepConditions node={node} />}
-      {hasArtifacts(node) && <StepArtifacts taskId={node.taskId} />}
+      {hasArtifacts(node) && <StepArtifacts taskId={node.taskId} stepName={node.name} />}
     </li>
   )
 }

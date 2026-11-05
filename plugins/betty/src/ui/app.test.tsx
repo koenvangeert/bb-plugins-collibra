@@ -400,8 +400,8 @@ describe('BETTY acceptance criteria', () => {
     expect(within(met).getByText('Met')).toBeTruthy()
     expect(within(met).getByText('The drawer lists Compliance apps in order')).toBeTruthy()
     expect(within(met).getByText(/I opened \/apps\.\s+The Compliance group rendered in order\./)).toBeTruthy()
-    await act(async () => within(met).getByRole('button', { name: 'Screenshot 1' }).click())
-    await act(async () => within(met).getByRole('button', { name: 'Screenshot 2' }).click())
+    await act(async () => within(met).getByRole('button', { name: 'AC-1 screenshot 1' }).click())
+    await act(async () => within(met).getByRole('button', { name: 'AC-1 screenshot 2' }).click())
     expect(slot.navigateCalls).toEqual([
       { method: 'openUrl', url: SCREENSHOT('ac-1-1') },
       { method: 'openUrl', url: SCREENSHOT('ac-1-2') },
@@ -488,8 +488,8 @@ describe('BETTY step artifacts', () => {
     { artifactId: 'a-transcript', kind: 'transcript', sizeBytes: 1531592, attempt: 1 },
   ]
 
-  function renderArtifacts(content: { content: string; note: string | null }) {
-    const stepArtifacts = vi.fn(() => ARTIFACTS)
+  function renderArtifacts(content: { content: string; note: string | null }, list: () => typeof ARTIFACTS = () => ARTIFACTS) {
+    const stepArtifacts = vi.fn(list)
     const artifact = vi.fn(() => content)
     const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, { stepArtifacts, artifact })
     return { slot, stepArtifacts, artifact }
@@ -501,7 +501,7 @@ describe('BETTY step artifacts', () => {
     const step = within(steps).getByRole('listitem', { name: 'validate-app' })
     expect(stepArtifacts).not.toHaveBeenCalled()
 
-    await act(async () => within(step).getByRole('button', { name: 'Artifacts' }).click())
+    await act(async () => within(step).getByRole('button', { name: 'Artifacts of validate-app' }).click())
     const list = await within(step).findByRole('list', { name: 'Artifacts' })
     expect(stepArtifacts).toHaveBeenCalledWith({ taskId: VALIDATE_APP.taskId })
     expect(within(list).getByRole('button', { name: 'transcript · 1.5 MB' })).toBeTruthy()
@@ -519,17 +519,35 @@ describe('BETTY step artifacts', () => {
     const { slot } = renderArtifacts({ content: 'x', note: 'truncated: showing the first 98304 bytes of a gzipped artifact (1531592 bytes compressed).' })
     const step = within(await slot.findByRole('region', { name: 'Steps' })).getByRole('listitem', { name: 'validate-app' })
 
-    await act(async () => within(step).getByRole('button', { name: 'Artifacts' }).click())
+    await act(async () => within(step).getByRole('button', { name: 'Artifacts of validate-app' }).click())
     await act(async () => (await within(step).findByRole('button', { name: 'transcript · 1.5 MB' })).click())
 
     expect(await within(step).findByText('truncated: showing the first 98304 bytes of a gzipped artifact (1531592 bytes compressed).')).toBeTruthy()
+  })
+
+  it('reads an open artifact list again every 30 seconds and shows the attempt once the step ran again', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    let list = ARTIFACTS
+    const { slot, stepArtifacts, artifact } = renderArtifacts({ content: 'Two findings.', note: null }, () => list)
+    const step = within(await slot.findByRole('region', { name: 'Steps' })).getByRole('listitem', { name: 'validate-app' })
+    await act(async () => within(step).getByRole('button', { name: 'Artifacts of validate-app' }).click())
+    await act(async () => (await within(step).findByRole('button', { name: 'post_review · 76 B' })).click())
+    await within(step).findByText('Two findings.')
+
+    list = [{ artifactId: 'a-result-2', kind: 'result', sizeBytes: 1229, attempt: 2 }, ...ARTIFACTS]
+    await act(async () => vi.advanceTimersByTime(30_000))
+
+    expect(await within(step).findByRole('button', { name: 'result · attempt 2 · 1.2 KB' })).toBeTruthy()
+    expect(within(step).getByRole('button', { name: 'post_review · attempt 1 · 76 B' })).toBeTruthy()
+    expect(stepArtifacts).toHaveBeenCalledTimes(2)
+    expect(artifact).toHaveBeenCalledTimes(1)
   })
 
   it('has no artifacts button on a step that did not start', async () => {
     const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'))
     const steps = await slot.findByRole('region', { name: 'Steps' })
 
-    expect(within(within(steps).getByRole('listitem', { name: 'remediate-app' })).queryByRole('button', { name: 'Artifacts' })).toBeNull()
+    expect(within(within(steps).getByRole('listitem', { name: 'remediate-app' })).queryByRole('button', { name: 'Artifacts of remediate-app' })).toBeNull()
   })
 })
 
