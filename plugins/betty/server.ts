@@ -7,6 +7,7 @@ import { createPestoClient } from './src/pesto/client'
 import { createMcpSession, PestoError } from './src/pesto/mcp'
 import { rpcContract } from './src/rpc'
 import { stopRun } from './src/runs/decide'
+import { createEvidenceLoader } from './src/runs/evidence'
 import { loadMyRuns } from './src/runs/myRuns'
 import { chipLabel } from './src/runChip'
 import { createRunWatcher } from './src/runWatcher'
@@ -14,6 +15,7 @@ import { mcpEndpoint, SETTINGS } from './src/settings'
 import { createThreadRuns, LINK_TOOL } from './src/threadRun'
 
 const CALLBACK_PATH = '/oauth/callback'
+const MAX_ARTIFACT_CHARS = 200_000
 
 export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
   async function plugin(bb: BbPluginApi) {
@@ -44,6 +46,7 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
     const session = createMcpSession({ endpoint: () => mcpEndpoint(baseUrl), getToken: auth.token, fetch: fetchFn })
     bb.onDispose(() => session.close())
     const pesto = createPestoClient(session)
+    const evidence = createEvidenceLoader(pesto)
 
     let ownerEmail: Promise<string> | null = null
     const owner = () => {
@@ -113,6 +116,12 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
         const result = await stopRun(pesto, runId)
         bb.rpc.experimental_invalidateAll()
         return result
+      },
+      runEvidence: async ({ runId }) => evidence.load((await pesto.dagStatus(runId)).nodes),
+      stepArtifacts: ({ taskId }) => pesto.taskLogs(taskId),
+      artifact: async ({ artifactId }) => {
+        const { kind, contentType, sizeBytes, content } = await pesto.artifact(artifactId)
+        return { kind, contentType, sizeBytes, content: content.slice(0, MAX_ARTIFACT_CHARS), truncated: content.length > MAX_ARTIFACT_CHARS }
       },
     })
 

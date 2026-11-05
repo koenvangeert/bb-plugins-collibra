@@ -324,3 +324,73 @@ describe('decisions', () => {
     expect(result).toEqual({ failed: [{ step: 'implement', error: 'task t-implement already finished' }] })
   })
 })
+
+const VALIDATE_APP = '65bee160-b71b-4d19-a614-8ff73e1cc3b3'
+
+describe('evidence and artifacts', () => {
+  const artifactGet = (args: Record<string, unknown>) => {
+    if (args.artifact_id) {
+      const content = args.artifact_id === 'short' ? 'done' : 'x'.repeat(200_001)
+      return { text: JSON.stringify({ artifact_id: args.artifact_id, kind: 'transcript', content_type: 'text/plain', size_bytes: 1531592, content }) }
+    }
+    if (args.task_id === VALIDATE_APP) return { text: fixture('artifact-result.json') }
+    return { text: `task ${String(args.task_id)} has no "result" artifact on any attempt; pesto_task_logs lists what it did produce`, isError: true }
+  }
+
+  async function evidenceHost() {
+    vi.useFakeTimers()
+    const { betty, pesto, fetch } = bettyWithPesto(undefined, {
+      pesto_artifact_get: artifactGet,
+      pesto_task_show: { text: fixture('task-show-validate.json') },
+      pesto_task_logs: { text: fixture('task-logs.json') },
+    })
+    const host = await signedIn(betty, fetch)
+    const sent = (name: string) => pesto.toolCalls().filter((call) => call.body!.params!.name === name).map((call) => call.body!.params!.arguments)
+    return { host, sent }
+  }
+
+  it('reads the AC evidence of a run once per finished step', async () => {
+    const { host, sent } = await evidenceHost()
+
+    const steps = (await host.harness.behavior.callRpc('runEvidence', { runId: 'central-frontend-team-browser-validated-f153a0' })) as {
+      step: string
+      criteria: { id: string; text: string | null; met: boolean }[]
+    }[]
+    const asked = sent('pesto_artifact_get').length
+    await host.harness.behavior.callRpc('runEvidence', { runId: 'central-frontend-team-browser-validated-f153a0' })
+
+    expect(steps.map((step) => step.step)).toEqual(['validate-app'])
+    expect(steps[0]!.criteria.map(({ id, text, met }) => [id, text, met])).toEqual([
+      ['AC-1', 'On an AI Agent asset with Guardian off, the tab bar has no Guardian tab', true],
+      ['AC-2', 'With AI Agent contracts off, the asset has no Contract tab', true],
+      ['AC-3', null, true],
+    ])
+    expect(sent('pesto_task_show')).toEqual([{ task_id: VALIDATE_APP }])
+    expect(sent('pesto_artifact_get')).toHaveLength(asked)
+  })
+
+  it('lists the artifacts of a step', async () => {
+    const { host, sent } = await evidenceHost()
+
+    const artifacts = (await host.harness.behavior.callRpc('stepArtifacts', { taskId: 'ff3bc7e0-644a-47b0-895b-368497922af8' })) as { kind: string }[]
+
+    expect(sent('pesto_task_logs')).toEqual([{ task_id: 'ff3bc7e0-644a-47b0-895b-368497922af8' }])
+    expect(artifacts.map((artifact) => artifact.kind)).toEqual(['post_review', 'result', 'transcript', 'usage_ledger'])
+  })
+
+  it('cuts a long artifact at 200 000 characters and says so', async () => {
+    const { host, sent } = await evidenceHost()
+
+    const artifact = (await host.harness.behavior.callRpc('artifact', { artifactId: 'f6cf7bf4' })) as { content: string; truncated: boolean; kind: string }
+
+    expect(sent('pesto_artifact_get')).toEqual([{ artifact_id: 'f6cf7bf4' }])
+    expect(artifact).toMatchObject({ kind: 'transcript', contentType: 'text/plain', sizeBytes: 1531592, truncated: true })
+    expect(artifact.content).toHaveLength(200_000)
+  })
+
+  it('sends a short artifact whole', async () => {
+    const { host } = await evidenceHost()
+
+    expect(await host.harness.behavior.callRpc('artifact', { artifactId: 'short' })).toMatchObject({ content: 'done', truncated: false })
+  })
+})
