@@ -1,7 +1,17 @@
 import { defineRpcContract } from '@get-bb/plugin-sdk'
 import { z } from 'zod'
 import { AUTH_KINDS } from './auth/state'
-import { NODE_STATUSES, PULL_REQUEST_STATES, RUN_OUTCOMES, type PullRequest, type RunDetail, type RunSummary } from './pesto/types'
+import {
+  NODE_STATUSES,
+  PULL_REQUEST_STATES,
+  RUN_OUTCOMES,
+  type Artifact,
+  type ArtifactEntry,
+  type PullRequest,
+  type RunDetail,
+  type RunSummary,
+} from './pesto/types'
+import type { StepEvidence } from './runs/evidence'
 import type { MyRuns } from './runs/myRuns'
 
 const pullRequest = z.object({
@@ -77,6 +87,37 @@ const stopResult = z.object({
   failed: z.array(z.object({ step: z.string(), error: z.string() })),
 })
 
+const step = { taskId: z.string(), step: z.string() }
+
+const stepEvidence = z.union([
+  z.object({
+    ...step,
+    criteria: z.array(
+      z.object({
+        id: z.string(),
+        text: z.string().nullable(),
+        met: z.boolean(),
+        evidence: z.string(),
+        images: z.array(z.string()),
+        fakedBackend: z.string().nullable(),
+      }),
+    ),
+  }),
+  z.object({ ...step, error: z.string() }),
+]) satisfies z.ZodType<StepEvidence>
+
+const artifactEntry = z.object({
+  artifactId: z.string(),
+  kind: z.string(),
+  sizeBytes: z.number(),
+  attempt: z.number(),
+}) satisfies z.ZodType<ArtifactEntry>
+
+const artifactContent = z.object({
+  content: z.string(),
+  note: z.string().nullable(),
+}) satisfies z.ZodType<Artifact>
+
 export const rpcContract = defineRpcContract({
   authStatus: { input: z.null(), output: z.object({ state: z.enum(AUTH_KINDS) }) },
   startSignIn: { input: z.null(), output: z.object({ url: z.url({ protocol: /^https$/ }) }) },
@@ -90,4 +131,7 @@ export const rpcContract = defineRpcContract({
   },
   denyStep: { input: z.object({ taskId: z.string().min(1), reason: z.string().trim().min(1) }), output: z.null() },
   stopRun: { input: z.object({ runId: z.string().min(1) }), output: stopResult },
+  runEvidence: { input: z.object({ runId: z.string().min(1) }), output: z.array(stepEvidence) },
+  stepArtifacts: { input: z.object({ taskId: z.string().min(1) }), output: z.array(artifactEntry) },
+  artifact: { input: z.object({ artifactId: z.string().min(1) }), output: artifactContent },
 })

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { PestoError, type McpSession } from './mcp'
-import type { Artifact, Identity, RunDetail, RunList } from './types'
-import { artifactSchema, identitySchema, runDetailSchema, runListSchema } from './wire'
+import type { AcVerdict, Artifact, ArtifactEntry, Identity, RunDetail, RunList, TaskShow } from './types'
+import { acEvidenceSchema, artifactSchema, identitySchema, runDetailSchema, runListSchema, taskLogsSchema, taskShowSchema } from './wire'
 
 export type ListRunsQuery = {
   ownerDev: string
@@ -10,8 +10,6 @@ export type ListRunsQuery = {
   limit?: number
   offset?: number
 }
-
-export type ArtifactQuery = { taskId: string; kind: string } | { artifactId: string }
 
 export type PestoClient = ReturnType<typeof createPestoClient>
 
@@ -40,12 +38,11 @@ export function createPestoClient(session: Pick<McpSession, 'callTool'>) {
         runListSchema,
       ),
     dagStatus: (runId: string): Promise<RunDetail> => call('pesto_dag_status', { run_id: runId }, runDetailSchema),
-    artifact: (query: ArtifactQuery): Promise<Artifact> =>
-      call(
-        'pesto_artifact_get',
-        'artifactId' in query ? { artifact_id: query.artifactId } : { task_id: query.taskId, kind: query.kind },
-        artifactSchema,
-      ),
+    artifact: (artifactId: string): Promise<Artifact> => call('pesto_artifact_get', { artifact_id: artifactId }, artifactSchema),
+    acEvidence: (taskId: string): Promise<AcVerdict[]> =>
+      call('pesto_artifact_get', { task_id: taskId, kind: 'result' }, acEvidenceSchema),
+    taskLogs: (taskId: string): Promise<ArtifactEntry[]> => call('pesto_task_logs', { task_id: taskId }, taskLogsSchema),
+    taskShow: (taskId: string): Promise<TaskShow> => call('pesto_task_show', { task_id: taskId }, taskShowSchema),
     whoami: (): Promise<Identity> => call('pesto_whoami', {}, identitySchema),
     approve: ({ taskId, budgetUsd, hint }: { taskId: string; budgetUsd: number; hint?: string }) =>
       act('pesto_task_approve', { task_id: taskId, cost_budget_usd: budgetUsd, hint: hint || undefined }),

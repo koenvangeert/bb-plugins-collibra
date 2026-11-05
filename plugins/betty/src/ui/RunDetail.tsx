@@ -10,6 +10,7 @@ import {
   attentionFirst,
   baseMayMislead,
   dagColumns,
+  hasArtifacts,
   nextAction,
   orderedActions,
   spendCeilings,
@@ -20,6 +21,7 @@ import {
   type NextAction,
   type SpendMeter,
 } from '../runs/detail'
+import { EvidenceSection, StepArtifacts } from './Evidence'
 import { money } from './format'
 import { useRefresh } from './refresh'
 
@@ -76,6 +78,7 @@ export function RunDetail({ runId, compact = false }: { runId: string; compact?:
       {pullRequests.map((pr) => (
         <PullRequestCard key={pr.url} pr={pr} />
       ))}
+      <EvidenceSection runId={runId} />
       {compact ? <CompactSteps nodes={nodes} /> : <StepColumns nodes={nodes} />}
     </div>
   )
@@ -501,6 +504,7 @@ function StepCard({ node, showCondition }: { node: RunNode; showCondition: boole
       </div>
       {node.budgetUsd !== null && <StepSpend costUsd={node.costUsd} budgetUsd={node.budgetUsd} />}
       {showCondition && <StepConditions node={node} />}
+      {hasArtifacts(node) && <StepArtifacts taskId={node.taskId} stepName={node.name} />}
     </li>
   )
 }

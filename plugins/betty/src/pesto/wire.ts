@@ -3,13 +3,16 @@ import {
   NODE_STATUSES,
   PULL_REQUEST_STATES,
   RUN_OUTCOMES,
+  type AcVerdict,
   type Artifact,
+  type ArtifactEntry,
   type Identity,
   type PullRequest,
   type RunDetail,
   type RunList,
   type RunNode,
   type RunSummary,
+  type TaskShow,
 } from './types'
 
 const pullRequest = z
@@ -152,20 +155,85 @@ export const runDetailSchema = z
   )
 
 export const artifactSchema = z
-  .object({
-    artifact_id: z.string(),
-    kind: z.string(),
-    content_type: z.string(),
-    size_bytes: z.number(),
-    content: z.string(),
+  .object({ content: z.string(), note: z.string().optional() })
+  .transform((artifact): Artifact => ({ content: artifact.content, note: artifact.note ?? null }))
+
+const resultContent = z
+  .string()
+  .transform((content, ctx) => {
+    try {
+      return JSON.parse(content) as unknown
+    } catch {
+      ctx.addIssue({ code: 'custom', message: 'the result artifact is not JSON' })
+      return z.NEVER
+    }
   })
+  .pipe(
+    z.object({
+      acs: z.array(
+        z.object({
+          id: z.string(),
+          met: z.boolean(),
+          evidence: z
+            .string()
+            .nullish()
+            .transform((evidence) => evidence ?? ''),
+          images: z
+            .array(z.string())
+            .nullish()
+            .transform((images) => images ?? []),
+        }),
+      ),
+    }),
+  )
+
+export const acEvidenceSchema = z.object({ content: resultContent }).transform(({ content }): AcVerdict[] => content.acs)
+
+export const taskLogsSchema = z
+  .object({
+    attempts: z
+      .array(
+        z.object({
+          attempt: z.number(),
+          artifacts: z
+            .array(
+              z.object({
+                artifact_id: z.string(),
+                kind: z.string(),
+                size_bytes: z.number().default(0),
+              }),
+            )
+            .default([]),
+        }),
+      )
+      .default([]),
+  })
+  .transform(({ attempts }): ArtifactEntry[] =>
+    [...attempts]
+      .sort((a, b) => b.attempt - a.attempt)
+      .flatMap(({ attempt, artifacts }) =>
+        artifacts.map((artifact) => ({
+          artifactId: artifact.artifact_id,
+          kind: artifact.kind,
+          sizeBytes: artifact.size_bytes,
+          attempt,
+        })),
+      ),
+  )
+
+const CRITERION_LINE = /^(AC-\d+):\s*(.+)$/
+
+export const taskShowSchema = z
+  .object({ required_artifacts: z.array(z.string()), acceptance_criteria: z.string().nullish() })
   .transform(
-    (artifact): Artifact => ({
-      artifactId: artifact.artifact_id,
-      kind: artifact.kind,
-      contentType: artifact.content_type,
-      sizeBytes: artifact.size_bytes,
-      content: artifact.content,
+    (task): TaskShow => ({
+      requiredArtifacts: task.required_artifacts,
+      criteria: Object.fromEntries(
+        (task.acceptance_criteria ?? '').split('\n').flatMap((line) => {
+          const criterion = line.trim().match(CRITERION_LINE)
+          return criterion ? [[criterion[1]!, criterion[2]!]] : []
+        }),
+      ),
     }),
   )
 

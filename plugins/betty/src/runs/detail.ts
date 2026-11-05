@@ -92,6 +92,10 @@ export function stepConditions(node: RunNode): StepCondition[] {
 
 const NOT_STARTED: ReadonlySet<NodeStatus> = new Set(['pending', 'queued', 'claimed', 'skipped', 'unknown'])
 
+export function hasArtifacts(node: RunNode): boolean {
+  return !NOT_STARTED.has(node.status)
+}
+
 function cleanRunSkips(nodes: readonly RunNode[]): Set<string> {
   const byName = new Map(nodes.map((node) => [node.name, node]))
   const gated = new Map<string, boolean>()

@@ -1,6 +1,6 @@
 import type { ThreadRun } from '../runChip'
 // @vitest-environment jsdom
-import { cleanup, fireEvent, within } from '@testing-library/react'
+import { cleanup, fireEvent, waitFor, within } from '@testing-library/react'
 import { act, type ComponentType } from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { loadPluginApp, renderSlot, type CapturedPluginApp } from '@get-bb/plugin-sdk/testing/app'
@@ -8,6 +8,7 @@ import type { AuthKind } from '../auth/state'
 import dagStatus from '../fixtures/dag-status.json'
 import type { PullRequest, RunDetail, RunOutcome, RunSummary } from '../pesto/types'
 import { runDetailSchema } from '../pesto/wire'
+import type { StepEvidence } from '../runs/evidence'
 import type { MyRuns } from '../runs/myRuns'
 
 const REFRESHED_AT = Date.parse('2026-11-02T11:15:30Z')
@@ -61,13 +62,17 @@ function renderPage(myRuns: () => MyRuns | Promise<MyRuns>, state: AuthKind = 's
   })
 }
 
-function renderDetail(runId: string, runDetail: () => RunDetail, list: () => MyRuns = () => myRuns()) {
+type RpcHandlers = NonNullable<Parameters<typeof renderSlot>[2]>['rpc']
+
+function renderDetail(runId: string, runDetail: () => RunDetail, list: () => MyRuns = () => myRuns(), rpc: RpcHandlers = {}) {
   return renderSlot(app.navPanels[0]!, { subPath: runId }, {
     rpc: {
       authStatus: () => ({ state: 'signed-in' }),
       startSignIn: () => ({ url: 'https://betty.test/oauth/authorize' }),
       myRuns: list,
       runDetail,
+      runEvidence: () => [],
+      ...rpc,
     },
   })
 }
@@ -350,6 +355,202 @@ describe('BETTY run detail', () => {
   })
 })
 
+const SCREENSHOT = (name: string) => `https://github.com/collibra/frontend/raw/a9fb6c6/${name}.png`
+
+const CLEAN_STEP = {
+  taskId: 't-validate-app',
+  step: 'validate-app',
+  criteria: [
+    {
+      id: 'AC-1',
+      text: 'The drawer lists Compliance apps in order',
+      met: true,
+      evidence: 'I opened /apps.\nThe Compliance group rendered in order.',
+      images: [SCREENSHOT('ac-1-1'), SCREENSHOT('ac-1-2')],
+      fakedBackend: null,
+    },
+    { id: 'AC-2', text: null, met: false, evidence: 'Not exercised.', images: [], fakedBackend: null },
+  ],
+} satisfies StepEvidence
+
+const CLEAN_EVIDENCE: StepEvidence[] = [CLEAN_STEP]
+
+const FAKED_SENTENCE = 'The browser rewrote the guardianOverview responses (magneto_playwright_route).'
+
+const FAKED_EVIDENCE: StepEvidence[] = [
+  {
+    ...CLEAN_STEP,
+    criteria: [
+      { ...CLEAN_STEP.criteria[0], evidence: `The DGC has no Guardian backend. ${FAKED_SENTENCE}`, fakedBackend: FAKED_SENTENCE },
+      CLEAN_STEP.criteria[1],
+    ],
+  },
+]
+
+const VALIDATE_APP = FIXTURE_DETAIL.nodes.find((node) => node.name === 'validate-app')!
+
+describe('BETTY acceptance criteria', () => {
+  it('shows each criterion with its verdict, text, evidence and screenshots that open', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, { runEvidence: () => CLEAN_EVIDENCE })
+
+    const step = await slot.findByRole('region', { name: 'Evidence of validate-app' })
+    expect(within(step).getByText('1 of 2 met')).toBeTruthy()
+
+    const met = within(step).getByRole('listitem', { name: 'AC-1' })
+    expect(within(met).getByText('Met')).toBeTruthy()
+    expect(within(met).getByText('The drawer lists Compliance apps in order')).toBeTruthy()
+    expect(within(met).getByText(/I opened \/apps\.\s+The Compliance group rendered in order\./)).toBeTruthy()
+    await act(async () => within(met).getByRole('button', { name: 'AC-1 screenshot 1' }).click())
+    await act(async () => within(met).getByRole('button', { name: 'AC-1 screenshot 2' }).click())
+    expect(slot.navigateCalls).toEqual([
+      { method: 'openUrl', url: SCREENSHOT('ac-1-1') },
+      { method: 'openUrl', url: SCREENSHOT('ac-1-2') },
+    ])
+
+    const notMet = within(step).getByRole('listitem', { name: 'AC-2' })
+    expect(within(notMet).getByText('Not met')).toBeTruthy()
+    expect(within(notMet).getByText('Not exercised.')).toBeTruthy()
+    expect(within(notMet).queryByRole('button')).toBeNull()
+  })
+
+  it('marks the criteria whose evidence mentions faked backend data', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, { runEvidence: () => FAKED_EVIDENCE })
+
+    const section = await slot.findByRole('region', { name: 'Acceptance criteria' })
+
+    expect(within(section).getByRole('status').textContent).toBe(
+      'Some evidence mentions faked backend data. Read the marked criteria before you trust them.',
+    )
+    const faked = within(section).getByRole('listitem', { name: 'AC-1' })
+    expect(within(faked).getByText('Faked backend data')).toBeTruthy()
+    expect(within(faked).getByText(FAKED_SENTENCE)).toBeTruthy()
+    expect(within(within(section).getByRole('listitem', { name: 'AC-2' })).queryByText('Faked backend data')).toBeNull()
+  })
+
+  it('does not warn about faked data when all evidence is real', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, { runEvidence: () => CLEAN_EVIDENCE })
+
+    const section = await slot.findByRole('region', { name: 'Acceptance criteria' })
+
+    expect(within(section).queryByRole('status')).toBeNull()
+    expect(within(section).queryByText('Faked backend data')).toBeNull()
+  })
+
+  it('shows the criteria in the run tab too', async () => {
+    const slot = renderSlot({ component: app.tabs[0]!.component as ComponentType<{ threadId: string }> }, { threadId: 'thr_1' }, {
+      rpc: {
+        authStatus: () => ({ state: 'signed-in' }),
+        myRuns: () => myRuns(),
+        threadRun: () => ({ kind: 'linked', runId: FIXTURE_DETAIL.runId, chip: null, pullRequests: [], error: null }),
+        runDetail: () => detailWithBase('main'),
+        runEvidence: () => FAKED_EVIDENCE,
+      },
+    })
+
+    expect(await slot.findByRole('region', { name: 'Evidence of validate-app' })).toBeTruthy()
+    expect(slot.getByRole('status').textContent).toContain('faked backend data')
+  })
+
+  it('has no criteria section for a run without evidence', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'))
+
+    await slot.findByRole('region', { name: 'Steps' })
+    await waitFor(() => expect(slot.queryByText('Loading the acceptance criteria.')).toBeNull())
+
+    expect(slot.queryByRole('region', { name: 'Acceptance criteria' })).toBeNull()
+  })
+
+  it('shows why the evidence of one step cannot be read and still shows the other steps', async () => {
+    const unreadable = { taskId: 't-revalidate-app', step: 'revalidate-app', error: 'BETTY is down' }
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, { runEvidence: () => [...CLEAN_EVIDENCE, unreadable] })
+
+    const failed = await slot.findByRole('region', { name: 'Evidence of revalidate-app' })
+
+    expect(within(failed).getByRole('alert').textContent).toBe('BETTY is down')
+    expect(within(failed).queryByRole('listitem')).toBeNull()
+    expect(within(slot.getByRole('region', { name: 'Evidence of validate-app' })).getByText('1 of 2 met')).toBeTruthy()
+  })
+
+  it('shows why the evidence cannot be read', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, {
+      runEvidence: () => {
+        throw new Error('BETTY is down')
+      },
+    })
+
+    expect((await slot.findByRole('alert')).textContent).toContain('BETTY is down')
+  })
+})
+
+describe('BETTY step artifacts', () => {
+  const ARTIFACTS = [
+    { artifactId: 'a-review', kind: 'post_review', sizeBytes: 76, attempt: 1 },
+    { artifactId: 'a-transcript', kind: 'transcript', sizeBytes: 1531592, attempt: 1 },
+  ]
+
+  function renderArtifacts(content: { content: string; note: string | null }, list: () => typeof ARTIFACTS = () => ARTIFACTS) {
+    const stepArtifacts = vi.fn(list)
+    const artifact = vi.fn(() => content)
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, { stepArtifacts, artifact })
+    return { slot, stepArtifacts, artifact }
+  }
+
+  it('loads the artifacts of a step only after a click and shows one after a click on it', async () => {
+    const { slot, stepArtifacts, artifact } = renderArtifacts({ content: 'Two findings.', note: null })
+    const steps = await slot.findByRole('region', { name: 'Steps' })
+    const step = within(steps).getByRole('listitem', { name: 'validate-app' })
+    expect(stepArtifacts).not.toHaveBeenCalled()
+
+    await act(async () => within(step).getByRole('button', { name: 'Artifacts of validate-app' }).click())
+    const list = await within(step).findByRole('list', { name: 'Artifacts' })
+    expect(stepArtifacts).toHaveBeenCalledWith({ taskId: VALIDATE_APP.taskId })
+    expect(within(list).getByRole('button', { name: 'transcript · 1.5 MB' })).toBeTruthy()
+    expect(artifact).not.toHaveBeenCalled()
+
+    await act(async () => within(list).getByRole('button', { name: 'post_review · 76 B' }).click())
+    expect(await within(list).findByText('Two findings.')).toBeTruthy()
+    expect(artifact).toHaveBeenCalledWith({ artifactId: 'a-review' })
+
+    await act(async () => within(list).getByRole('button', { name: 'post_review · 76 B' }).click())
+    expect(within(list).queryByText('Two findings.')).toBeNull()
+  })
+
+  it('shows the note PESTO sends when it cut an artifact', async () => {
+    const { slot } = renderArtifacts({ content: 'x', note: 'truncated: showing the first 98304 bytes of a gzipped artifact (1531592 bytes compressed).' })
+    const step = within(await slot.findByRole('region', { name: 'Steps' })).getByRole('listitem', { name: 'validate-app' })
+
+    await act(async () => within(step).getByRole('button', { name: 'Artifacts of validate-app' }).click())
+    await act(async () => (await within(step).findByRole('button', { name: 'transcript · 1.5 MB' })).click())
+
+    expect(await within(step).findByText('truncated: showing the first 98304 bytes of a gzipped artifact (1531592 bytes compressed).')).toBeTruthy()
+  })
+
+  it('reads an open artifact list again every 30 seconds and shows the attempt once the step ran again', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    let list = ARTIFACTS
+    const { slot, stepArtifacts, artifact } = renderArtifacts({ content: 'Two findings.', note: null }, () => list)
+    const step = within(await slot.findByRole('region', { name: 'Steps' })).getByRole('listitem', { name: 'validate-app' })
+    await act(async () => within(step).getByRole('button', { name: 'Artifacts of validate-app' }).click())
+    await act(async () => (await within(step).findByRole('button', { name: 'post_review · 76 B' })).click())
+    await within(step).findByText('Two findings.')
+
+    list = [{ artifactId: 'a-result-2', kind: 'result', sizeBytes: 1229, attempt: 2 }, ...ARTIFACTS]
+    await act(async () => vi.advanceTimersByTime(30_000))
+
+    expect(await within(step).findByRole('button', { name: 'result · attempt 2 · 1.2 KB' })).toBeTruthy()
+    expect(within(step).getByRole('button', { name: 'post_review · attempt 1 · 76 B' })).toBeTruthy()
+    expect(stepArtifacts).toHaveBeenCalledTimes(2)
+    expect(artifact).toHaveBeenCalledTimes(1)
+  })
+
+  it('has no artifacts button on a step that did not start', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'))
+    const steps = await slot.findByRole('region', { name: 'Steps' })
+
+    expect(within(within(steps).getByRole('listitem', { name: 'remediate-app' })).queryByRole('button', { name: 'Artifacts of remediate-app' })).toBeNull()
+  })
+})
+
 const DECISION_DETAIL: RunDetail = {
   ...FIXTURE_DETAIL,
   nodes: FIXTURE_DETAIL.nodes.map((node) => {
@@ -372,6 +573,7 @@ function renderDecision(handlers: { approveStep?: () => null; denyStep?: () => n
       startSignIn: () => ({ url: 'https://betty.test/oauth/authorize' }),
       myRuns: () => myRuns(),
       runDetail,
+      runEvidence: () => [],
       approveStep,
       denyStep,
       stopRun,
@@ -528,6 +730,7 @@ function renderThreadTab(threadRun: ThreadRun, runDetail: () => RunDetail = () =
       myRuns: () => myRuns(),
       threadRun: () => threadRun,
       runDetail,
+      runEvidence: () => [],
     },
   })
 }

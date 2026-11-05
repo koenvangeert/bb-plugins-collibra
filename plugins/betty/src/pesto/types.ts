@@ -77,12 +77,12 @@ export type RunDetail = {
   pullRequests: PullRequest[]
 }
 
-export type Artifact = {
-  artifactId: string
-  kind: string
-  contentType: string
-  sizeBytes: number
-  content: string
-}
+export type Artifact = { content: string; note: string | null }
+
+export type AcVerdict = { id: string; met: boolean; evidence: string; images: string[] }
+
+export type ArtifactEntry = { artifactId: string; kind: string; sizeBytes: number; attempt: number }
+
+export type TaskShow = { requiredArtifacts: string[]; criteria: Record<string, string> }
 
 export type Identity = { email: string | null }
