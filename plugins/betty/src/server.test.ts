@@ -330,8 +330,8 @@ const VALIDATE_APP = '65bee160-b71b-4d19-a614-8ff73e1cc3b3'
 describe('evidence and artifacts', () => {
   const artifactGet = (args: Record<string, unknown>) => {
     if (args.artifact_id) {
-      const content = args.artifact_id === 'short' ? 'done' : 'x'.repeat(200_001)
-      return { text: JSON.stringify({ artifact_id: args.artifact_id, kind: 'transcript', content_type: 'text/plain', size_bytes: 1531592, content }) }
+      const cut = args.artifact_id === 'short' ? { content: 'done' } : { content: 'x'.repeat(98_304), note: 'truncated: showing the first 98304 bytes of a gzipped artifact (1531592 bytes compressed).' }
+      return { text: JSON.stringify({ artifact_id: args.artifact_id, kind: 'transcript', content_type: 'text/plain', size_bytes: 1531592, ...cut }) }
     }
     if (args.task_id === VALIDATE_APP) return { text: fixture('artifact-result.json') }
     return { text: `task ${String(args.task_id)} has no "result" artifact on any attempt; pesto_task_logs lists what it did produce`, isError: true }
@@ -378,19 +378,19 @@ describe('evidence and artifacts', () => {
     expect(artifacts.map((artifact) => artifact.kind)).toEqual(['post_review', 'result', 'transcript', 'usage_ledger'])
   })
 
-  it('cuts a long artifact at 200 000 characters and says so', async () => {
+  it('passes on the note PESTO sends when it cut an artifact', async () => {
     const { host, sent } = await evidenceHost()
 
-    const artifact = (await host.harness.behavior.callRpc('artifact', { artifactId: 'f6cf7bf4' })) as { content: string; truncated: boolean; kind: string }
+    const artifact = (await host.harness.behavior.callRpc('artifact', { artifactId: 'f6cf7bf4' })) as { content: string }
 
     expect(sent('pesto_artifact_get')).toEqual([{ artifact_id: 'f6cf7bf4' }])
-    expect(artifact).toMatchObject({ kind: 'transcript', contentType: 'text/plain', sizeBytes: 1531592, truncated: true })
-    expect(artifact.content).toHaveLength(200_000)
+    expect(artifact).toMatchObject({ kind: 'transcript', contentType: 'text/plain', sizeBytes: 1531592, note: 'truncated: showing the first 98304 bytes of a gzipped artifact (1531592 bytes compressed).' })
+    expect(artifact.content).toHaveLength(98_304)
   })
 
   it('sends a short artifact whole', async () => {
     const { host } = await evidenceHost()
 
-    expect(await host.harness.behavior.callRpc('artifact', { artifactId: 'short' })).toMatchObject({ content: 'done', truncated: false })
+    expect(await host.harness.behavior.callRpc('artifact', { artifactId: 'short' })).toMatchObject({ content: 'done', note: null })
   })
 })

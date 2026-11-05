@@ -115,7 +115,7 @@ const artifactContent = z.object({
   contentType: z.string(),
   sizeBytes: z.number(),
   content: z.string(),
-  truncated: z.boolean(),
+  note: z.string().nullable(),
 })
 
 export const rpcContract = defineRpcContract({

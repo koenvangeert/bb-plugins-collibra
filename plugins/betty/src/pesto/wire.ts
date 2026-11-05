@@ -161,6 +161,7 @@ export const artifactSchema = z
     content_type: z.string(),
     size_bytes: z.number(),
     content: z.string(),
+    note: z.string().optional(),
   })
   .transform(
     (artifact): Artifact => ({
@@ -169,6 +170,7 @@ export const artifactSchema = z
       contentType: artifact.content_type,
       sizeBytes: artifact.size_bytes,
       content: artifact.content,
+      note: artifact.note ?? null,
     }),
   )
 

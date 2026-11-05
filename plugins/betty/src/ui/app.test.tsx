@@ -478,7 +478,7 @@ describe('BETTY step artifacts', () => {
     { artifactId: 'a-transcript', kind: 'transcript', contentType: 'application/gzip', sizeBytes: 1531592, attempt: 1 },
   ]
 
-  function renderArtifacts(content: { content: string; truncated: boolean }) {
+  function renderArtifacts(content: { content: string; note: string | null }) {
     const stepArtifacts = vi.fn(() => ARTIFACTS)
     const artifact = vi.fn(() => ({ kind: 'post_review', contentType: 'text/plain', sizeBytes: 76, ...content }))
     const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, { stepArtifacts, artifact })
@@ -486,7 +486,7 @@ describe('BETTY step artifacts', () => {
   }
 
   it('loads the artifacts of a step only after a click and shows one after a click on it', async () => {
-    const { slot, stepArtifacts, artifact } = renderArtifacts({ content: 'Two findings.', truncated: false })
+    const { slot, stepArtifacts, artifact } = renderArtifacts({ content: 'Two findings.', note: null })
     const steps = await slot.findByRole('region', { name: 'Steps' })
     const step = within(steps).getByRole('listitem', { name: 'validate-app' })
     expect(stepArtifacts).not.toHaveBeenCalled()
@@ -500,20 +500,19 @@ describe('BETTY step artifacts', () => {
     await act(async () => within(list).getByRole('button', { name: 'post_review · 76 B' }).click())
     expect(await within(list).findByText('Two findings.')).toBeTruthy()
     expect(artifact).toHaveBeenCalledWith({ artifactId: 'a-review' })
-    expect(within(list).queryByText('Shows only the start of this artifact.')).toBeNull()
 
     await act(async () => within(list).getByRole('button', { name: 'post_review · 76 B' }).click())
     expect(within(list).queryByText('Two findings.')).toBeNull()
   })
 
-  it('says when it shows only the start of an artifact', async () => {
-    const { slot } = renderArtifacts({ content: 'x', truncated: true })
+  it('shows the note PESTO sends when it cut an artifact', async () => {
+    const { slot } = renderArtifacts({ content: 'x', note: 'truncated: showing the first 98304 bytes of a gzipped artifact (1531592 bytes compressed).' })
     const step = within(await slot.findByRole('region', { name: 'Steps' })).getByRole('listitem', { name: 'validate-app' })
 
     await act(async () => within(step).getByRole('button', { name: 'Artifacts' }).click())
     await act(async () => (await within(step).findByRole('button', { name: 'transcript · 1.5 MB' })).click())
 
-    expect(await within(step).findByText('Shows only the start of this artifact.')).toBeTruthy()
+    expect(await within(step).findByText('truncated: showing the first 98304 bytes of a gzipped artifact (1531592 bytes compressed).')).toBeTruthy()
   })
 
   it('has no artifacts button on a step that did not start', async () => {

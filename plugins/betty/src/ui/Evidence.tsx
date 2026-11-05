@@ -137,9 +137,7 @@ function ArtifactViewer({ artifactId }: { artifactId: string }) {
 
   return (
     <div className="flex flex-col gap-1">
-      {query.data.truncated && (
-        <p className="m-0 text-xs text-muted-foreground">Shows only the start of this artifact.</p>
-      )}
+      {query.data.note !== null && <p className="m-0 text-xs text-muted-foreground">{query.data.note}</p>}
       <pre className="m-0 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-2 font-mono text-xs">{query.data.content}</pre>
     </div>
   )

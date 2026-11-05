@@ -83,6 +83,7 @@ export type Artifact = {
   contentType: string
   sizeBytes: number
   content: string
+  note: string | null
 }
 
 export type AcVerdict = { id: string; met: boolean; evidence: string; images: string[] }

@@ -15,7 +15,6 @@ import { mcpEndpoint, SETTINGS } from './src/settings'
 import { createThreadRuns, LINK_TOOL } from './src/threadRun'
 
 const CALLBACK_PATH = '/oauth/callback'
-const MAX_ARTIFACT_CHARS = 200_000
 
 export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
   async function plugin(bb: BbPluginApi) {
@@ -120,8 +119,8 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
       runEvidence: async ({ runId }) => evidence.load((await pesto.dagStatus(runId)).nodes),
       stepArtifacts: ({ taskId }) => pesto.taskLogs(taskId),
       artifact: async ({ artifactId }) => {
-        const { kind, contentType, sizeBytes, content } = await pesto.artifact(artifactId)
-        return { kind, contentType, sizeBytes, content: content.slice(0, MAX_ARTIFACT_CHARS), truncated: content.length > MAX_ARTIFACT_CHARS }
+        const { kind, contentType, sizeBytes, content, note } = await pesto.artifact(artifactId)
+        return { kind, contentType, sizeBytes, content, note }
       },
     })
 
