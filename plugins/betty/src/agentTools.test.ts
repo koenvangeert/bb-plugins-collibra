@@ -58,11 +58,13 @@ describe('betty_status', () => {
       status: statuses[index % 3],
       error: 'boom '.repeat(1000),
     }))
-    const host = await signedIn({ pesto_dag_status: { text: runJson(nodes) } })
+    const pullRequest = { number: 26731, url: 'https://github.com/collibra/frontend/pull/26731', state: 'open', base: 'main', repo: 'collibra/frontend' }
+    const host = await signedIn({ pesto_dag_status: { text: runJson(nodes, [pullRequest]) } })
 
     const { text } = await call(host, 'betty_status', { runId: 'huge' })
 
     expect(text.length).toBeLessThan(4000)
+    expect(text.split('\n')[1]).toBe('PR collibra/frontend#26731, open, https://github.com/collibra/frontend/pull/26731')
     expect(text).toMatch(/more lines cut\.\nThe full run is in the BETTY run tab of the thread\. .*call betty_evidence with its taskId\.$/)
   })
 
@@ -98,6 +100,27 @@ describe('betty_status', () => {
 })
 
 describe('betty_evidence', () => {
+  it('keeps a full page whole with the longest artifact id and PESTO note', async () => {
+    const artifactId = 'a'.repeat(200)
+    const content = 'x'.repeat(10_000)
+    const host = await signedIn({ pesto_artifact_get: { text: JSON.stringify({ content, note: 'n'.repeat(5000) }) } })
+
+    const { text } = await call(host, 'betty_evidence', { artifactId })
+
+    expect(text.length).toBeLessThan(4000)
+    expect(text.split('\n')[1]).toBe('x'.repeat(3000))
+    expect(text).toMatch(/offset 3000\.$/)
+  })
+
+  it('says an empty artifact is empty', async () => {
+    const host = await signedIn({ pesto_artifact_get: { text: JSON.stringify({ content: '' }) } })
+
+    const { text, isError } = await call(host, 'betty_evidence', { artifactId: 'empty' })
+
+    expect(isError).toBe(false)
+    expect(text).toBe('Artifact empty is empty.\nThere is nothing more to read.')
+  })
+
   it('answers with the AC evidence of the linked run and warns about faked backend data', async () => {
     const host = await signedIn()
 
@@ -194,4 +217,4 @@ async function call(host: FakePluginHost, tool: string, input: Record<string, un
   return { text: result.content.map((part) => ('text' in part ? part.text : '')).join(''), isError: result.isError === true }
 }
 
-const runJson = (nodes: object[]) => JSON.stringify({ run_id: 'huge', total_cost_usd: 99, nodes })
+const runJson = (nodes: object[], pull_requests: object[] = []) => JSON.stringify({ run_id: 'huge', total_cost_usd: 99, nodes, pull_requests })

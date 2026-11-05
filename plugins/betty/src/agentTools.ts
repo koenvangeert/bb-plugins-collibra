@@ -54,7 +54,7 @@ export function statusAnswer(run: RunDetail): Answer {
       `PR ${pr.repo}#${pr.number}, ${pr.state}, ${pr.url}${pr.base === 'main' ? '' : `. Its base is ${pr.base || 'unknown'}, not main, so CI may run only a few checks.`}`,
   )
   return {
-    lines: [`${chipLabel(runChip(run))} · run ${run.runId}`, ...steps, ...pullRequests],
+    lines: [`${chipLabel(runChip(run))} · run ${run.runId}`, ...pullRequests, ...steps],
     pointer: `The full run is in the BETTY run tab of the thread. For the AC evidence, call ${EVIDENCE_TOOL}. For the artifacts of a step, call ${EVIDENCE_TOOL} with its taskId.`,
   }
 }
@@ -89,7 +89,8 @@ export function artifactPageAnswer(artifactId: string, artifact: Artifact, offse
   const total = artifact.content.length
   const end = Math.min(offset + PAGE_SIZE, total)
   const note = artifact.note ? ` PESTO note: ${field(artifact.note, 300)}` : ''
-  if (offset >= total && total > 0) {
+  if (total === 0) return { lines: [`Artifact ${artifactId} is empty.${note}`], pointer: 'There is nothing more to read.' }
+  if (offset >= total) {
     return { lines: [`Artifact ${artifactId} has ${total} chars, so offset ${offset} is past the end.${note}`], pointer: `Start again with offset 0.` }
   }
   return {
