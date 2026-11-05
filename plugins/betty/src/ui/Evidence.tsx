@@ -21,7 +21,7 @@ export function EvidenceSection({ runId }: { runId: string }) {
   if (!query.data) return <p className="m-0 text-sm text-muted-foreground">Loading the acceptance criteria.</p>
   if (query.data.length === 0) return null
 
-  const faked = query.data.some((step) => step.criteria.some((criterion) => criterion.fakedBackend !== null))
+  const faked = query.data.some((step) => 'criteria' in step && step.criteria.some((criterion) => criterion.fakedBackend !== null))
   return (
     <section aria-label="Acceptance criteria" className="flex flex-col gap-3">
       <h3 className="m-0 text-sm font-semibold">Acceptance criteria</h3>
@@ -40,20 +40,25 @@ export function EvidenceSection({ runId }: { runId: string }) {
 }
 
 function StepEvidenceCard({ step }: { step: StepEvidence }) {
-  const met = step.criteria.filter((criterion) => criterion.met).length
   return (
     <section aria-label={`Evidence of ${step.step}`} className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="font-medium">{step.step}</span>
-        <span className="text-xs tabular-nums text-muted-foreground">
-          {met} of {step.criteria.length} met
-        </span>
+        {'criteria' in step && (
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {step.criteria.filter((criterion) => criterion.met).length} of {step.criteria.length} met
+          </span>
+        )}
       </div>
-      <ul className="m-0 flex list-none flex-col gap-3 p-0">
-        {step.criteria.map((criterion) => (
-          <CriterionItem key={criterion.id} criterion={criterion} />
-        ))}
-      </ul>
+      {'criteria' in step ? (
+        <ul className="m-0 flex list-none flex-col gap-3 p-0">
+          {step.criteria.map((criterion) => (
+            <CriterionItem key={criterion.id} criterion={criterion} />
+          ))}
+        </ul>
+      ) : (
+        <p role="alert" className="m-0 text-sm text-destructive">{step.error}</p>
+      )}
     </section>
   )
 }

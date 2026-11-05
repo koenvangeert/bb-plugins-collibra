@@ -87,20 +87,24 @@ const stopResult = z.object({
   failed: z.array(z.object({ step: z.string(), error: z.string() })),
 })
 
-const stepEvidence = z.object({
-  taskId: z.string(),
-  step: z.string(),
-  criteria: z.array(
-    z.object({
-      id: z.string(),
-      text: z.string().nullable(),
-      met: z.boolean(),
-      evidence: z.string(),
-      images: z.array(z.string()),
-      fakedBackend: z.string().nullable(),
-    }),
-  ),
-}) satisfies z.ZodType<StepEvidence>
+const step = { taskId: z.string(), step: z.string() }
+
+const stepEvidence = z.union([
+  z.object({
+    ...step,
+    criteria: z.array(
+      z.object({
+        id: z.string(),
+        text: z.string().nullable(),
+        met: z.boolean(),
+        evidence: z.string(),
+        images: z.array(z.string()),
+        fakedBackend: z.string().nullable(),
+      }),
+    ),
+  }),
+  z.object({ ...step, error: z.string() }),
+]) satisfies z.ZodType<StepEvidence>
 
 const artifactEntry = z.object({
   artifactId: z.string(),

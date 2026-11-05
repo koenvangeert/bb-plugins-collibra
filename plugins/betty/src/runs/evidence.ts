@@ -11,7 +11,9 @@ export type Criterion = {
   fakedBackend: string | null
 }
 
-export type StepEvidence = { taskId: string; step: string; criteria: Criterion[] }
+type Step = { taskId: string; step: string }
+
+export type StepEvidence = (Step & { criteria: Criterion[] }) | (Step & { error: string })
 
 const FAKED_BACKEND: readonly RegExp[] = [
   /simulated backend/i,
@@ -61,8 +63,12 @@ export function createEvidenceLoader(pesto: Pick<PestoClient, 'acEvidence' | 'ta
       const candidates = dagColumns(nodes)
         .flat()
         .filter((node) => node.executor === 'agent' && HAS_EVIDENCE.has(node.status))
-      const steps = await Promise.all(candidates.map(cached))
-      return steps.filter((step): step is StepEvidence => step !== null)
+      const reads = await Promise.allSettled(candidates.map(cached))
+      return reads.flatMap((read, index): StepEvidence[] => {
+        if (read.status === 'fulfilled') return read.value ? [read.value] : []
+        const node = candidates[index]!
+        return [{ taskId: node.taskId, step: node.name, error: read.reason instanceof Error ? read.reason.message : String(read.reason) }]
+      })
     },
   }
 }

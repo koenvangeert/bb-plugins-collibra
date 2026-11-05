@@ -3,7 +3,7 @@ import { createPestoClient } from '../pesto/client'
 import { createFakePesto, fixture } from '../pesto/fakePesto'
 import { createMcpSession } from '../pesto/mcp'
 import type { RunNode } from '../pesto/types'
-import { createEvidenceLoader, fakedBackendSentence } from './evidence'
+import { createEvidenceLoader, fakedBackendSentence, type Criterion, type StepEvidence } from './evidence'
 
 const evidenceOf = (name: string): string[] =>
   JSON.parse(JSON.parse(fixture(name)).content).acs.map((ac: { evidence: string }) => ac.evidence)
@@ -84,6 +84,11 @@ function loaderWith(results = RESULTS) {
   return { loader: createEvidenceLoader(createPestoClient(session)), asked }
 }
 
+function criteriaOf(step: StepEvidence): Criterion[] {
+  if (!('criteria' in step)) throw new Error(step.error)
+  return step.criteria
+}
+
 const RUN: RunNode[] = [
   node('revalidate-app', { status: 'failed', dependsOn: ['validate-app'] }),
   node('validate-app', { dependsOn: ['implement'] }),
@@ -102,7 +107,7 @@ describe('evidence loader', () => {
     const steps = await loader.load(RUN)
 
     expect(steps.map((step) => step.step)).toEqual(['validate-app', 'revalidate-app'])
-    expect(steps[0]!.criteria).toEqual([
+    expect(steps[0]).toHaveProperty('criteria', [
       {
         id: 'AC-1',
         text: 'On an AI Agent asset with Guardian off, the tab bar has no Guardian tab',
@@ -123,7 +128,7 @@ describe('evidence loader', () => {
         fakedBackend: null,
       },
     ])
-    expect(steps[1]!.criteria.map((criterion) => [criterion.id, criterion.text])).toEqual([
+    expect(criteriaOf(steps[1]!).map((criterion) => [criterion.id, criterion.text])).toEqual([
       ['AC-1', 'The Compliance group is in order'],
       ['AC-2', null],
       ['AC-3', 'The other menus keep their order'],
@@ -139,10 +144,13 @@ describe('evidence loader', () => {
     expect(asked('pesto_artifact_get').sort()).toEqual(['t-revalidate-app', 't-validate-app'])
   })
 
-  it('passes on an error while it reads a result', async () => {
+  it('reports a failed read on its own step and keeps the other steps', async () => {
     const { loader } = loaderWith({ ...RESULTS, 't-validate-app': () => ({ text: 'BETTY is down', isError: true }) })
 
-    await expect(loader.load(RUN)).rejects.toThrow('BETTY is down')
+    const steps = await loader.load(RUN)
+
+    expect(steps[0]).toEqual({ taskId: 't-validate-app', step: 'validate-app', error: expect.stringContaining('BETTY is down') })
+    expect(steps[1]).toMatchObject({ step: 'revalidate-app', criteria: expect.any(Array) })
   })
 
   it('does not ask again for a finished step it already read', async () => {
@@ -172,11 +180,11 @@ describe('evidence loader', () => {
       ...RESULTS,
       't-validate-app': () => (down ? { text: 'BETTY is down', isError: true } : { text: fixture('artifact-result-faked.json') }),
     })
-    await expect(loader.load(RUN)).rejects.toThrow('BETTY is down')
+    expect((await loader.load(RUN))[0]).toHaveProperty('error')
 
     down = false
 
-    await expect(loader.load(RUN)).resolves.toHaveLength(2)
+    expect((await loader.load(RUN))[0]).toHaveProperty('criteria')
     expect(asked('pesto_artifact_get').filter((taskId) => taskId === 't-validate-app')).toHaveLength(2)
   })
 })

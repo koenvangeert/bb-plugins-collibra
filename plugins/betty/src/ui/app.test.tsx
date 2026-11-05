@@ -357,32 +357,32 @@ describe('BETTY run detail', () => {
 
 const SCREENSHOT = (name: string) => `https://github.com/collibra/frontend/raw/a9fb6c6/${name}.png`
 
-const CLEAN_EVIDENCE: StepEvidence[] = [
-  {
-    taskId: 't-validate-app',
-    step: 'validate-app',
-    criteria: [
-      {
-        id: 'AC-1',
-        text: 'The drawer lists Compliance apps in order',
-        met: true,
-        evidence: 'I opened /apps.\nThe Compliance group rendered in order.',
-        images: [SCREENSHOT('ac-1-1'), SCREENSHOT('ac-1-2')],
-        fakedBackend: null,
-      },
-      { id: 'AC-2', text: null, met: false, evidence: 'Not exercised.', images: [], fakedBackend: null },
-    ],
-  },
-]
+const CLEAN_STEP = {
+  taskId: 't-validate-app',
+  step: 'validate-app',
+  criteria: [
+    {
+      id: 'AC-1',
+      text: 'The drawer lists Compliance apps in order',
+      met: true,
+      evidence: 'I opened /apps.\nThe Compliance group rendered in order.',
+      images: [SCREENSHOT('ac-1-1'), SCREENSHOT('ac-1-2')],
+      fakedBackend: null,
+    },
+    { id: 'AC-2', text: null, met: false, evidence: 'Not exercised.', images: [], fakedBackend: null },
+  ],
+} satisfies StepEvidence
+
+const CLEAN_EVIDENCE: StepEvidence[] = [CLEAN_STEP]
 
 const FAKED_SENTENCE = 'The browser rewrote the guardianOverview responses (magneto_playwright_route).'
 
 const FAKED_EVIDENCE: StepEvidence[] = [
   {
-    ...CLEAN_EVIDENCE[0]!,
+    ...CLEAN_STEP,
     criteria: [
-      { ...CLEAN_EVIDENCE[0]!.criteria[0]!, evidence: `The DGC has no Guardian backend. ${FAKED_SENTENCE}`, fakedBackend: FAKED_SENTENCE },
-      CLEAN_EVIDENCE[0]!.criteria[1]!,
+      { ...CLEAN_STEP.criteria[0], evidence: `The DGC has no Guardian backend. ${FAKED_SENTENCE}`, fakedBackend: FAKED_SENTENCE },
+      CLEAN_STEP.criteria[1],
     ],
   },
 ]
@@ -458,6 +458,17 @@ describe('BETTY acceptance criteria', () => {
     await waitFor(() => expect(slot.queryByText('Loading the acceptance criteria.')).toBeNull())
 
     expect(slot.queryByRole('region', { name: 'Acceptance criteria' })).toBeNull()
+  })
+
+  it('shows why the evidence of one step cannot be read and still shows the other steps', async () => {
+    const unreadable = { taskId: 't-revalidate-app', step: 'revalidate-app', error: 'BETTY is down' }
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, { runEvidence: () => [...CLEAN_EVIDENCE, unreadable] })
+
+    const failed = await slot.findByRole('region', { name: 'Evidence of revalidate-app' })
+
+    expect(within(failed).getByRole('alert').textContent).toBe('BETTY is down')
+    expect(within(failed).queryByRole('listitem')).toBeNull()
+    expect(within(slot.getByRole('region', { name: 'Evidence of validate-app' })).getByText('1 of 2 met')).toBeTruthy()
   })
 
   it('shows why the evidence cannot be read', async () => {
