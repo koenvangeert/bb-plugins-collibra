@@ -86,7 +86,7 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
       },
     })
     const answerTools = registerAgentTools(bb.agents, { pesto, evidence, linkedRunId: runs.linkedRunId, isSignedIn })
-    bb.agents.configure(() => ({ tools: [LINK_TOOL, ...answerTools], skills: [] }))
+    bb.agents.configure(() => ({ tools: [LINK_TOOL, ...answerTools], skills: ['betty'] }))
 
     settings.onChange((next) => {
       if (next.baseUrl !== baseUrl) reload()
