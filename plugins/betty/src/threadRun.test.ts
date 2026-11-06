@@ -1,4 +1,5 @@
 import { createFakePluginHost, makePluginAgentConfigurationContext, type FakePluginHost } from '@get-bb/plugin-sdk/testing'
+import { readdirSync, readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPlugin } from '../server'
 import { createFakeBetty } from './auth/fakeBetty'
@@ -61,7 +62,7 @@ async function start(threads: Threads, pestoUp = { value: true }) {
     if (!pestoUp.value) return Promise.resolve(new Response('unavailable', { status: 503 }))
     return pesto.fetch(input, init)
   }
-  const host = createFakePluginHost({ pluginId: 'betty', settings: { baseUrl: betty.base }, sdk: threads.sdk })
+  const host = createFakePluginHost({ pluginId: 'betty', settings: { baseUrl: betty.base }, sdk: threads.sdk, agentSkillIds: shippedSkillNames() })
   await createPlugin({ fetch })(host.bb)
   const { url } = (await host.harness.behavior.callRpc('startSignIn', null)) as { url: string }
   await host.harness.behavior.fetchHttp('GET', `/oauth/callback?${new URLSearchParams(betty.approve(url))}`)
@@ -152,12 +153,13 @@ describe('thread run link', () => {
     expect(await threadRun(host)).toEqual({ kind: 'none', ticketKey: null })
   })
 
-  it('selects the link, status and evidence tools for every agent session', async () => {
+  it('selects the link, status and evidence tools and the betty skill for every agent session', async () => {
     const { host } = await start(createFakeThreads())
 
     const config = await host.harness.behavior.resolveAgentConfiguration(makePluginAgentConfigurationContext({}))
 
     expect(config.tools.map((tool) => tool.name)).toEqual(['betty_link_run', 'betty_status', 'betty_evidence'])
+    expect(config.skills).toEqual(['betty'])
   })
 
   it('keeps the link and shows the error when BETTY cannot be read', async () => {
@@ -217,3 +219,8 @@ describe('thread without a run', () => {
     expect(threads.sent[0]!.text).toContain('the work in this thread')
   })
 })
+
+function shippedSkillNames(): string[] {
+  const root = new URL('../skills/', import.meta.url)
+  return readdirSync(root).map((dir) => readFileSync(new URL(`${dir}/SKILL.md`, root), 'utf8').match(/^name: (.+)$/m)![1]!)
+}
