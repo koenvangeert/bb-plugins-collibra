@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { STATUS_TOOL } from './agentTools'
 import type { PestoClient } from './pesto/client'
 import { RUN_STATUSES, runStatus, type RunStatus } from './runChip'
 import type { ThreadRunSdk } from './threadRun'
@@ -59,7 +60,7 @@ export function createRunWatcher(deps: {
     if (status === run.status) return
     const notice = NOTICE[status]
     if (notice) {
-      const text = `BETTY run \`${run.runId}\` ${notice}.`
+      const text = `BETTY run \`${run.runId}\` ${notice}. Call ${STATUS_TOOL} for the details.`
       await sdk.send({ threadId: run.threadId, input: [{ type: 'text', text, mentions: [] }], mode: 'queue-if-active' })
     }
     watch({ ...run, status })

@@ -84,7 +84,7 @@ describe('run watcher', () => {
     await nextTick()
     await nextTick()
 
-    expect(threads.sent).toEqual([{ threadId: THREAD, text: `BETTY run \`${RUN}\` needs a decision.` }])
+    expect(threads.sent).toEqual([{ threadId: THREAD, text: `BETTY run \`${RUN}\` needs a decision. Call betty_status for the details.` }])
   })
 
   it.each([
@@ -103,7 +103,7 @@ describe('run watcher', () => {
     await nextTick()
     await nextTick()
 
-    expect(threads.sent).toEqual([{ threadId: THREAD, text: `BETTY run \`${RUN}\` ${notice}.` }])
+    expect(threads.sent).toEqual([{ threadId: THREAD, text: `BETTY run \`${RUN}\` ${notice}. Call betty_status for the details.` }])
     expect(statusCalls()).toBe(callsAfterEnd)
   })
 
@@ -149,7 +149,7 @@ describe('run watcher', () => {
 
     threads.behavior.sendFails = false
     await nextTick()
-    expect(threads.sent).toEqual([{ threadId: THREAD, text: `BETTY run \`${RUN}\` failed.` }])
+    expect(threads.sent).toEqual([{ threadId: THREAD, text: `BETTY run \`${RUN}\` failed. Call betty_status for the details.` }])
   })
 
   it('keeps checking the other runs when one run cannot be read', async () => {
@@ -164,7 +164,7 @@ describe('run watcher', () => {
     runs.set('run-2', ['failed'])
     await nextTick()
 
-    expect(threads.sent).toEqual([{ threadId: 'thread-2', text: 'BETTY run `run-2` failed.' }])
+    expect(threads.sent).toEqual([{ threadId: 'thread-2', text: 'BETTY run `run-2` failed. Call betty_status for the details.' }])
   })
 
   it('does not call BETTY when the user is not signed in', async () => {

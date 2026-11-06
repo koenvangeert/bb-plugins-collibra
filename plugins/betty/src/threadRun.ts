@@ -52,6 +52,8 @@ export function createThreadRuns({
   }
 
   return {
+    linkedRunId,
+
     async threadRun(threadId: string): Promise<ThreadRun> {
       const runId = await linkedRunId(threadId)
       if (!runId) return { kind: 'none', ticketKey: await ticketKey(threadId) }

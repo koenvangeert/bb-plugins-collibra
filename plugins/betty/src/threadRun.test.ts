@@ -152,12 +152,12 @@ describe('thread run link', () => {
     expect(await threadRun(host)).toEqual({ kind: 'none', ticketKey: null })
   })
 
-  it('selects the link tool for every agent session', async () => {
+  it('selects the link, status and evidence tools for every agent session', async () => {
     const { host } = await start(createFakeThreads())
 
     const config = await host.harness.behavior.resolveAgentConfiguration(makePluginAgentConfigurationContext({}))
 
-    expect(config.tools.map((tool) => tool.name)).toEqual(['betty_link_run'])
+    expect(config.tools.map((tool) => tool.name)).toEqual(['betty_link_run', 'betty_status', 'betty_evidence'])
   })
 
   it('keeps the link and shows the error when BETTY cannot be read', async () => {
