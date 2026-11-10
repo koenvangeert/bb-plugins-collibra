@@ -115,7 +115,7 @@ You can also ask the agent in your own words. The `betty` skill tells it to link
 
 ### Run watcher
 
-While you are signed in, the plugin checks each linked run every 30 seconds. When the run status changes to needs a decision, failed, cancelled or finished, it sends the thread one message. The message tells the agent to call `betty_status`. A run that is already in that status when you link it gets no message.
+While you are signed in, the plugin checks each linked run every 30 seconds. When the run status changes to needs a decision, failed, cancelled or finished, it sends the thread one message. The message tells the agent to call `betty_status`. A run that is already in that status when you link it gets no message. When a thread links a new run, the plugin stops checking the old run.
 
 ## Setting
 
@@ -137,7 +137,6 @@ Change it with `bb plugin config betty set baseUrl https://...`. A changed `base
 - Sign-in works only from a browser on the bb server machine. A remote bb, such as bb Connect or a phone, cannot sign in.
 - The BETTY page needs your email from BETTY. An `api_key` connection sends none, so the page shows an error.
 - Each PESTO query asks for 100 runs at most. When PESTO has more, the page says that older runs are cut off.
-- A thread links one run. A new `betty_link_run` replaces the link in the header and the tab. The run watcher still sends messages about the old run until it ends.
 - Starting a run needs the pesto MCP in the agent. The plugin itself does not submit runs.
 - "Clean run" and "Worst case" count one attempt per step, so a retried step can spend more.
 - A pending run can show a clean run that is too low. A pending step that waits on a fix-up step counts as skipped until it runs.

@@ -40,11 +40,15 @@ export function createRunWatcher(deps: {
   const { db, pesto, sdk, isSignedIn, log } = deps
 
   const watch = ({ runId, threadId, status }: WatchedRun) => {
+    db.prepare('DELETE FROM watched_runs WHERE thread_id = ? AND run_id != ?').run(threadId, runId)
     db.prepare(
       `INSERT INTO watched_runs (run_id, thread_id, status) VALUES (?, ?, ?)
        ON CONFLICT (run_id) DO UPDATE SET thread_id = excluded.thread_id, status = excluded.status`,
     ).run(runId, threadId, status)
   }
+
+  const isWatched = ({ runId, threadId }: WatchedRun) =>
+    db.prepare('SELECT 1 FROM watched_runs WHERE run_id = ? AND thread_id = ?').all(runId, threadId).length > 0
 
   const activeRuns = (): WatchedRun[] =>
     db
@@ -57,13 +61,13 @@ export function createRunWatcher(deps: {
 
   const check = async (run: WatchedRun) => {
     const status = runStatus((await pesto.dagStatus(run.runId)).nodes)
-    if (status === run.status) return
+    if (status === run.status || !isWatched(run)) return
     const notice = NOTICE[status]
     if (notice) {
       const text = `BETTY run \`${run.runId}\` ${notice}. Call ${STATUS_TOOL} for the details.`
       await sdk.send({ threadId: run.threadId, input: [{ type: 'text', text, mentions: [] }], mode: 'queue-if-active' })
     }
-    watch({ ...run, status })
+    db.prepare('UPDATE watched_runs SET status = ? WHERE run_id = ?').run(status, run.runId)
   }
 
   const tick = async (signal: AbortSignal) => {

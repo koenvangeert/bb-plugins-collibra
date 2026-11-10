@@ -12,7 +12,7 @@ export type RecordedRequest = {
 type ToolReply = { text: string; isError?: boolean } | { rpcError: string }
 
 export function createFakePesto(options: {
-  tools?: Record<string, ToolReply | ((args: Record<string, unknown>) => ToolReply)>
+  tools?: Record<string, ToolReply | ((args: Record<string, unknown>) => ToolReply | Promise<ToolReply>)>
   sse?: boolean
 }) {
   const requests: RecordedRequest[] = []
@@ -45,7 +45,7 @@ export function createFakePesto(options: {
         return new Response('unknown session', { status: 404 })
       }
       const tool = options.tools?.[body.params?.name ?? '']
-      const reply = typeof tool === 'function' ? tool(body.params?.arguments ?? {}) : tool
+      const reply = typeof tool === 'function' ? await tool(body.params?.arguments ?? {}) : tool
       if (reply === undefined) return json({ jsonrpc: '2.0', id: body.id, error: { code: -32602, message: 'unknown tool' } })
       const message =
         'rpcError' in reply
