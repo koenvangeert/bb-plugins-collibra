@@ -10,12 +10,15 @@ const RUN = 'run-1'
 
 function createFakeThreads() {
   const sent: { threadId: string; text: string }[] = []
-  const behavior = { sendFails: false }
+  const behavior: { sendFails: boolean; beforeNextSend?: () => Promise<unknown> } = { sendFails: false }
   const sdk = {
     threads: {
       getPluginMetadata: async () => ({}),
       updatePluginMetadata: async () => ({}),
       send: async ({ threadId, input }: { threadId: string; input: { type: string; text?: string }[] }) => {
+        const hook = behavior.beforeNextSend
+        behavior.beforeNextSend = undefined
+        await hook?.()
         if (behavior.sendFails) throw new Error('thread is gone')
         sent.push({ threadId, text: input.map((part) => part.text ?? '').join('') })
         return {}
@@ -200,6 +203,25 @@ describe('run watcher', () => {
     await nextTick()
 
     expect(threads.sent).toEqual([])
+  })
+
+  it('keeps the new run watched when the thread links it while the old run sends its message', async () => {
+    const { host, runs, threads } = await start()
+    runs.set(RUN, ['running'])
+    runs.set('run-2', ['running'])
+    await link(host())
+    await watch(host())
+
+    runs.set(RUN, ['failed'])
+    threads.behavior.beforeNextSend = () => link(host(), 'run-2')
+    await nextTick()
+    runs.set('run-2', ['suspended'])
+    await nextTick()
+
+    expect(threads.sent).toEqual([
+      { threadId: THREAD, text: `BETTY run \`${RUN}\` failed. Call betty_status for the details.` },
+      { threadId: THREAD, text: 'BETTY run `run-2` needs a decision. Call betty_status for the details.' },
+    ])
   })
 
   it('does not call BETTY when the user is not signed in', async () => {
