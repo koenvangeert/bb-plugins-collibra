@@ -10,12 +10,15 @@ const RUN = 'run-1'
 
 function createFakeThreads() {
   const sent: { threadId: string; text: string }[] = []
-  const behavior = { sendFails: false }
+  const behavior: { sendFails: boolean; beforeNextSend?: () => Promise<unknown> } = { sendFails: false }
   const sdk = {
     threads: {
       getPluginMetadata: async () => ({}),
       updatePluginMetadata: async () => ({}),
       send: async ({ threadId, input }: { threadId: string; input: { type: string; text?: string }[] }) => {
+        const hook = behavior.beforeNextSend
+        behavior.beforeNextSend = undefined
+        await hook?.()
         if (behavior.sendFails) throw new Error('thread is gone')
         sent.push({ threadId, text: input.map((part) => part.text ?? '').join('') })
         return {}
@@ -29,9 +32,13 @@ function createFakeThreads() {
 async function start() {
   const betty = createFakeBetty()
   const runs = new Map<string, NodeStatus[]>()
+  const beforeNextStatus = new Map<string, () => Promise<unknown>>()
   const pesto = createFakePesto({
     tools: {
-      pesto_dag_status: ({ run_id }) => {
+      pesto_dag_status: async ({ run_id }) => {
+        const hook = beforeNextStatus.get(String(run_id))
+        beforeNextStatus.delete(String(run_id))
+        await hook?.()
         const statuses = runs.get(String(run_id))
         if (!statuses) return { text: `run ${String(run_id)} not found`, isError: true }
         const nodes = statuses.map((status, index) => ({ task_id: `t${index}`, name: `n${index}`, executor: 'agent', status }))
@@ -51,7 +58,8 @@ async function start() {
   const restart = async () => (host = await host.harness.lifecycle.reload(createPlugin({ fetch })))
   await restart()
   const statusCalls = () => pesto.toolCalls().filter((call) => call.body?.params?.name === 'pesto_dag_status').length
-  return { host: () => host, restart, runs, threads, betty, statusCalls }
+  const onNextStatus = (runId: string, hook: () => Promise<unknown>) => beforeNextStatus.set(runId, hook)
+  return { host: () => host, restart, runs, threads, betty, statusCalls, onNextStatus }
 }
 
 const link = (host: FakePluginHost, runId = RUN, threadId = THREAD) =>
@@ -165,6 +173,55 @@ describe('run watcher', () => {
     await nextTick()
 
     expect(threads.sent).toEqual([{ threadId: 'thread-2', text: 'BETTY run `run-2` failed. Call betty_status for the details.' }])
+  })
+
+  it('tells the thread only about the run it linked last', async () => {
+    const { host, runs, threads } = await start()
+    runs.set(RUN, ['running'])
+    runs.set('run-2', ['running'])
+    await link(host())
+    await link(host(), 'run-2')
+    await watch(host())
+
+    runs.set(RUN, ['failed'])
+    runs.set('run-2', ['suspended'])
+    await nextTick()
+
+    expect(threads.sent).toEqual([{ threadId: THREAD, text: 'BETTY run `run-2` needs a decision. Call betty_status for the details.' }])
+  })
+
+  it('says nothing about the old run when the thread links a new run during a check', async () => {
+    const { host, runs, threads, onNextStatus } = await start()
+    runs.set(RUN, ['running'])
+    runs.set('run-2', ['running'])
+    await link(host())
+    await watch(host())
+
+    runs.set(RUN, ['failed'])
+    onNextStatus(RUN, () => link(host(), 'run-2'))
+    await nextTick()
+    await nextTick()
+
+    expect(threads.sent).toEqual([])
+  })
+
+  it('keeps the new run watched when the thread links it while the old run sends its message', async () => {
+    const { host, runs, threads } = await start()
+    runs.set(RUN, ['running'])
+    runs.set('run-2', ['running'])
+    await link(host())
+    await watch(host())
+
+    runs.set(RUN, ['failed'])
+    threads.behavior.beforeNextSend = () => link(host(), 'run-2')
+    await nextTick()
+    runs.set('run-2', ['suspended'])
+    await nextTick()
+
+    expect(threads.sent).toEqual([
+      { threadId: THREAD, text: `BETTY run \`${RUN}\` failed. Call betty_status for the details.` },
+      { threadId: THREAD, text: 'BETTY run `run-2` needs a decision. Call betty_status for the details.' },
+    ])
   })
 
   it('does not call BETTY when the user is not signed in', async () => {

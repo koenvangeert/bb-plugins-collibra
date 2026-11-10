@@ -45,4 +45,3 @@ The "Run with BETTY" button in the thread header sends this request as a prompt.
 
 - A pull request whose base is not `main` can show green CI on a few checks only. The status answer says so.
 - Evidence that mentions faked backend data gets a warning. Do not report those criteria as proven.
-- A thread links one run. A new `betty_link_run` replaces the link. Messages about the old run still arrive until it ends.
