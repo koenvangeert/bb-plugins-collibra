@@ -9,6 +9,7 @@ import { createMcpSession, PestoError } from './src/pesto/mcp'
 import { rpcContract } from './src/rpc'
 import { stopRun } from './src/runs/decide'
 import { createEvidenceLoader } from './src/runs/evidence'
+import { createScreenshotLoader } from './src/screenshots'
 import { loadMyRuns } from './src/runs/myRuns'
 import { chipLabel } from './src/runChip'
 import { createRunWatcher } from './src/runWatcher'
@@ -47,6 +48,7 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
     bb.onDispose(() => session.close())
     const pesto = createPestoClient(session)
     const evidence = createEvidenceLoader(pesto)
+    const screenshots = createScreenshotLoader()
 
     let ownerEmail: Promise<string> | null = null
     const owner = () => {
@@ -122,6 +124,7 @@ export const createPlugin = (deps: { fetch?: typeof fetch } = {}) =>
       runEvidence: async ({ runId }) => evidence.load((await pesto.dagStatus(runId)).nodes),
       stepArtifacts: ({ taskId }) => pesto.taskLogs(taskId),
       artifact: ({ artifactId }) => pesto.artifact(artifactId),
+      screenshot: ({ url }) => screenshots.load(url),
     })
 
     bb.http.route(

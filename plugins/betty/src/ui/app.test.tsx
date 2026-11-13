@@ -390,8 +390,13 @@ const FAKED_EVIDENCE: StepEvidence[] = [
 const VALIDATE_APP = FIXTURE_DETAIL.nodes.find((node) => node.name === 'validate-app')!
 
 describe('BETTY acceptance criteria', () => {
-  it('shows each criterion with its verdict, text, evidence and screenshots that open', async () => {
-    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, { runEvidence: () => CLEAN_EVIDENCE })
+  it('shows each criterion with its verdict, text, evidence and screenshot links when bb cannot load the screenshots', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, {
+      runEvidence: () => CLEAN_EVIDENCE,
+      screenshot: () => {
+        throw new Error('gh could not load the screenshot')
+      },
+    })
 
     const step = await slot.findByRole('region', { name: 'Evidence of validate-app' })
     expect(within(step).getByText('1 of 2 met')).toBeTruthy()
@@ -411,6 +416,22 @@ describe('BETTY acceptance criteria', () => {
     expect(within(notMet).getByText('Not met')).toBeTruthy()
     expect(within(notMet).getByText('Not exercised.')).toBeTruthy()
     expect(within(notMet).queryByRole('button')).toBeNull()
+  })
+
+  it('shows the screenshots inline and opens one in the lightbox', async () => {
+    const slot = renderDetail(FIXTURE_DETAIL.runId, () => detailWithBase('main'), undefined, {
+      runEvidence: () => CLEAN_EVIDENCE,
+      screenshot: (input) => ({ src: `data:image/png;base64,${btoa((input as { url: string }).url)}` }),
+    })
+
+    const met = await slot.findByRole('listitem', { name: 'AC-1' })
+    const thumbnail = await within(met).findByRole('img', { name: 'AC-1 screenshot 2' })
+    expect(thumbnail.getAttribute('src')).toBe(`data:image/png;base64,${btoa(SCREENSHOT('ac-1-2'))}`)
+
+    await act(async () => within(met).getByRole('button', { name: 'AC-1 screenshot 2' }).click())
+
+    await waitFor(() => expect(slot.getAllByRole('img', { name: 'AC-1 screenshot 2' })).toHaveLength(2))
+    expect(slot.navigateCalls).toEqual([])
   })
 
   it('marks the criteria whose evidence mentions faked backend data', async () => {

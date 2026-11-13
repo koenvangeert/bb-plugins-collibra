@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { experimental_Icon as Icon, experimental_useRpcQuery, useBbNavigate } from '@get-bb/plugin-sdk/app'
+import { experimental_Icon as Icon, experimental_ImageLightbox as ImageLightbox, experimental_useRpcQuery, useBbNavigate } from '@get-bb/plugin-sdk/app'
 import { rpcContract } from '../rpc'
 import type { Criterion, StepEvidence } from '../runs/evidence'
 import { bytes } from './format'
@@ -64,7 +64,6 @@ function StepEvidenceCard({ step }: { step: StepEvidence }) {
 }
 
 function CriterionItem({ criterion }: { criterion: Criterion }) {
-  const navigate = useBbNavigate()
   const verdict = VERDICT_STYLE[criterion.met ? 'met' : 'notMet']
   return (
     <li aria-label={criterion.id} className="flex flex-col gap-1.5 border-t border-border pt-3 text-sm first:border-t-0 first:pt-0">
@@ -81,23 +80,69 @@ function CriterionItem({ criterion }: { criterion: Criterion }) {
       {criterion.text !== null && <p className="m-0 font-medium">{criterion.text}</p>}
       {criterion.fakedBackend !== null && <p className={`m-0 rounded-md border px-2 py-1 text-xs ${AMBER}`}>{criterion.fakedBackend}</p>}
       <p className="m-0 whitespace-pre-wrap break-words text-xs text-muted-foreground">{criterion.evidence}</p>
-      {criterion.images.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {criterion.images.map((url, index) => (
-            <button
-              key={url}
-              type="button"
-              aria-label={`${criterion.id} screenshot ${index + 1}`}
-              className={`flex items-center gap-1.5 ${BUTTON}`}
-              onClick={() => navigate.openUrl(url)}
-            >
-              <Icon name="Image" fallback="ExternalLink" aria-hidden className="size-3.5" />
-              Screenshot {index + 1}
-            </button>
-          ))}
-        </div>
-      )}
+      {criterion.images.length > 0 && <Screenshots criterionId={criterion.id} urls={criterion.images} />}
     </li>
+  )
+}
+
+function Screenshots({ criterionId, urls }: { criterionId: string; urls: readonly string[] }) {
+  const [open, setOpen] = useState<number | null>(null)
+  const shown = open === null ? null : { index: open, label: `${criterionId} screenshot ${open + 1}` }
+  const lightbox = experimental_useRpcQuery({
+    contract: rpcContract,
+    method: 'screenshot',
+    input: { url: urls[open ?? 0]! },
+    enabled: open !== null,
+  })
+  return (
+    <>
+      <div className="flex flex-wrap gap-2">
+        {urls.map((url, index) => (
+          <Screenshot key={url} url={url} criterionId={criterionId} number={index + 1} onOpen={() => setOpen(index)} />
+        ))}
+      </div>
+      {shown && (
+        <ImageLightbox
+          isOpen
+          title={shown.label}
+          imageAlt={shown.label}
+          imageSrc={lightbox.data?.src ?? null}
+          hasMultipleImages={urls.length > 1}
+          navigationStatus={`${shown.index + 1} of ${urls.length}`}
+          previousDisabled={shown.index === 0}
+          nextDisabled={shown.index === urls.length - 1}
+          onPrevious={() => setOpen(shown.index - 1)}
+          onNext={() => setOpen(shown.index + 1)}
+          onClose={() => setOpen(null)}
+        />
+      )}
+    </>
+  )
+}
+
+function Screenshot({ url, criterionId, number, onOpen }: { url: string; criterionId: string; number: number; onOpen: () => void }) {
+  const navigate = useBbNavigate()
+  const label = `${criterionId} screenshot ${number}`
+  const query = experimental_useRpcQuery({ contract: rpcContract, method: 'screenshot', input: { url } })
+
+  if (query.data) {
+    return (
+      <button type="button" aria-label={label} className="overflow-hidden rounded-md border border-border hover:border-foreground/40" onClick={onOpen}>
+        <img src={query.data.src} alt={label} className="block h-32 w-auto max-w-full object-contain" />
+      </button>
+    )
+  }
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={query.error?.message}
+      className={`flex items-center gap-1.5 ${BUTTON}`}
+      onClick={() => navigate.openUrl(url)}
+    >
+      <Icon name="Image" fallback="ExternalLink" aria-hidden className="size-3.5" />
+      Screenshot {number}
+    </button>
   )
 }
 

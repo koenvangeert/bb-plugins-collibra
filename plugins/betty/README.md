@@ -9,6 +9,7 @@ You need:
 - bb 0.47 or later, and [bun](https://bun.sh).
 - A BETTY account.
 - The pesto MCP in your agent, to start runs. Reading runs does not need it.
+- The GitHub CLI (`gh`), signed in with access to the run's repo, to show screenshots inline.
 
 ### 1. Install the plugin
 
@@ -88,7 +89,7 @@ You can also ask the agent in your own words. The `betty` skill tells it to link
 - "Clean run up to" adds the budgets of the steps that run when no condition fires. It leaves out the conditional fix-up steps (with a `when`) and the steps that wait on them, because PESTO skips those too. A step that waits on a fix-up step counts again when it already ran after that fix-up step was skipped, and an `always_run` step always counts. "Worst case up to" adds the budgets of all steps.
 - Each pull request has an "Open PR" button, its repo, and `head → base`. Below it is the list of steps that acted on it (review, remediation, CI watch). Click an entry to open its review or comment on GitHub. An entry that has not happened yet shows "planned".
 - The steps show in columns. A step's column is its longest path from a first step. Each step shows its status, its spend against its budget (or its executor when it has no budget), and when it runs.
-- Each agent step that finished and checked the acceptance criteria lists them as met or not met, with the evidence and links to the screenshots.
+- Each agent step that finished and checked the acceptance criteria lists them as met or not met, with the evidence and the screenshots. Click a screenshot to open it full size.
 - Each step that started has an "Artifacts" button. It loads the step's artifacts, such as review findings and logs, when you click it.
 - The detail reads the run again every 30 seconds.
 
@@ -141,6 +142,7 @@ Change it with `bb plugin config betty set baseUrl https://...`. A changed `base
 - "Clean run" and "Worst case" count one attempt per step, so a retried step can spend more.
 - A pending run can show a clean run that is too low. A pending step that waits on a fix-up step counts as skipped until it runs.
 - When a pull request's base is not `main`, CI may run only a few checks, so a green CI can mislead. The run detail and `betty_status` warn about it.
+- Screenshots load with `gh` on the bb server. Without `gh`, or for a URL that is not a GitHub raw URL pinned to a commit, the run detail shows a link instead.
 - Evidence that mentions faked backend data gets a warning. Read those criteria before you trust them.
 - The plugin reads runs and decides on steps. It does not change a run's DAG or retry a failed run.
 
