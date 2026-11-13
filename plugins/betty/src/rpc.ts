@@ -134,4 +134,5 @@ export const rpcContract = defineRpcContract({
   runEvidence: { input: z.object({ runId: z.string().min(1) }), output: z.array(stepEvidence) },
   stepArtifacts: { input: z.object({ taskId: z.string().min(1) }), output: z.array(artifactEntry) },
   artifact: { input: z.object({ artifactId: z.string().min(1) }), output: artifactContent },
+  screenshot: { input: z.object({ url: z.string().min(1) }), output: z.object({ src: z.string() }) },
 })
