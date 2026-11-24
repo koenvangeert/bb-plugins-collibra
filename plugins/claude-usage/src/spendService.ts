@@ -1,6 +1,7 @@
 import { buildAttributionMap, type AttributionMap, type AttributionSource } from './attribution'
 import { buildDashboard, buildThreadSpend, type SpendDashboardData, type ThreadSpendData } from './dashboard'
 import type { SqlDatabase } from './database'
+import { createMergedPullRequestCache, withMergedPullRequests } from './mergedPullRequests'
 import { loadSpendIndex, saveTranscripts } from './indexStore'
 import { scanTranscripts, type ScanResult, type TranscriptFileSystem } from './scanner'
 import type { SpendIndex } from './spendIndex'
@@ -13,12 +14,14 @@ export interface SpendServiceDependencies {
   fs: TranscriptFileSystem
   root: string
   loadAttributionSource(): Promise<AttributionSource>
+  loadMergedPullRequests(sinceDay: string): Promise<number[]>
   now(): number
   onError?(message: string, error: unknown): void
 }
 
 export interface DashboardResult extends SpendDashboardData {
   indexing: boolean
+  mergedPullRequestsKnown: boolean
 }
 
 export interface SpendService {
@@ -33,6 +36,11 @@ export function createSpendService(dependencies: SpendServiceDependencies): Spen
   let queue: Promise<unknown> = Promise.resolve()
   let attributionMap: AttributionMap | null = null
   let attributionLoadedAt = 0
+  const mergedPullRequests = createMergedPullRequestCache({
+    load: dependencies.loadMergedPullRequests,
+    now: dependencies.now,
+    onError: dependencies.onError,
+  })
 
   /**
    * Scans a copy and swaps it in only after the rows are stored: a transcript
@@ -61,15 +69,27 @@ export function createSpendService(dependencies: SpendServiceDependencies): Spen
     return attributionMap
   }
 
+  async function warmMergedPullRequests(): Promise<void> {
+    const dashboard = buildDashboard(index, await currentAttributionMap(), dependencies.now())
+    mergedPullRequests.mergedSince(dashboard.dailySeries[0]!.day)
+  }
+
   return {
     refresh(signal) {
       const run = queue.then(() => scanOnce(signal))
       queue = run.catch(() => undefined)
+      void run.then(warmMergedPullRequests, () => undefined)
       return run
     },
     async getDashboard() {
       const dashboard = buildDashboard(index, await currentAttributionMap(), dependencies.now())
-      return { ...dashboard, indexing: !scannedOnce && index.transcripts.size === 0 }
+      const mergedAt = mergedPullRequests.mergedSince(dashboard.dailySeries[0]!.day)
+      return {
+        ...dashboard,
+        dailySeries: withMergedPullRequests(dashboard.dailySeries, mergedAt),
+        indexing: !scannedOnce && index.transcripts.size === 0,
+        mergedPullRequestsKnown: mergedAt !== null,
+      }
     },
     async getThreadSpend(threadId) {
       return buildThreadSpend(index, await currentAttributionMap(), threadId)

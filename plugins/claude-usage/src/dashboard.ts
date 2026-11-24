@@ -25,6 +25,7 @@ export interface DailySpend {
   day: string
   total: number
   breakdown: CostBreakdown
+  mergedPullRequests: number
 }
 
 export interface ScopeSpend {
@@ -105,7 +106,12 @@ function dailySeriesUpTo(
   for (let position = 0; position < length; position += 1) {
     const day = localDayOf(cursor.getTime())
     const bucket = daily.get(day)
-    series.push({ day, total: bucket?.total ?? 0, breakdown: bucket?.breakdown ?? { ...EMPTY_COST } })
+    series.push({
+      day,
+      total: bucket?.total ?? 0,
+      breakdown: bucket?.breakdown ?? { ...EMPTY_COST },
+      mergedPullRequests: 0,
+    })
     cursor.setDate(cursor.getDate() - 1)
   }
   return series.reverse()

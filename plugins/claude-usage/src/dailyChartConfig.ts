@@ -26,33 +26,68 @@ export interface ChartPalette {
   surface: string
 }
 
+export const MERGED_PULL_REQUESTS_LABEL = 'Merged PRs'
+export const PULL_REQUEST_AXIS = 'pullRequests'
+
+interface SpendDataset {
+  type: 'bar'
+  label: string
+  data: number[]
+  backgroundColor: string
+  borderWidth: number
+  borderRadius: number
+  stack: string
+}
+
+interface PullRequestDataset {
+  type: 'line'
+  label: string
+  data: number[]
+  borderColor: string
+  backgroundColor: string
+  borderWidth: number
+  pointRadius: number
+  yAxisID: string
+  order: number
+}
+
 export interface DailyChartData {
   labels: string[]
-  datasets: Array<{
-    label: string
-    data: number[]
-    backgroundColor: string
-    borderWidth: number
-    borderRadius: number
-    stack: string
-  }>
+  datasets: Array<SpendDataset | PullRequestDataset>
 }
 
 /**
  * Stacked bottom-up, so the series order here is the visual order from the axis
  * upward and reversing it would put the largest slice on top.
  */
-export function buildDailyChartData(series: DailySpend[], palette: ChartPalette): DailyChartData {
+export function buildDailyChartData(
+  series: DailySpend[],
+  palette: ChartPalette,
+  showPullRequests: boolean,
+): DailyChartData {
+  const spend: SpendDataset[] = CHART_SERIES.map((entry) => ({
+    type: 'bar',
+    label: entry.label,
+    data: series.map((day) => day.breakdown[entry.key]),
+    backgroundColor: palette.series[entry.key] ?? palette.text,
+    borderWidth: 0,
+    borderRadius: 2,
+    stack: 'spend',
+  }))
+  const pullRequests: PullRequestDataset = {
+    type: 'line',
+    label: MERGED_PULL_REQUESTS_LABEL,
+    data: series.map((day) => day.mergedPullRequests),
+    borderColor: palette.text,
+    backgroundColor: palette.text,
+    borderWidth: 2,
+    pointRadius: 2,
+    yAxisID: PULL_REQUEST_AXIS,
+    order: -1,
+  }
   return {
     labels: series.map((day) => formatDayLabel(day.day)),
-    datasets: CHART_SERIES.map((entry) => ({
-      label: entry.label,
-      data: series.map((day) => day.breakdown[entry.key]),
-      backgroundColor: palette.series[entry.key] ?? palette.text,
-      borderWidth: 0,
-      borderRadius: 2,
-      stack: 'spend',
-    })),
+    datasets: showPullRequests ? [...spend, pullRequests] : spend,
   }
 }
 
@@ -89,4 +124,8 @@ export function tooltipLine(label: string, value: number, total: number): string
   if (value <= 0) return ''
   const share = total > 0 ? Math.round((value / total) * 100) : 0
   return `${label}: ${formatMoney(value)} (${share}%)`
+}
+
+export function pullRequestTooltipLine(count: number): string {
+  return count > 0 ? `${MERGED_PULL_REQUESTS_LABEL}: ${count}` : ''
 }
