@@ -5,6 +5,9 @@ import {
   CategoryScale,
   Chart,
   LinearScale,
+  LineController,
+  LineElement,
+  PointElement,
   Tooltip,
   type ChartConfiguration,
 } from "chart.js";
@@ -13,13 +16,15 @@ import {
   buildDailyChartData,
   CHART_SERIES,
   dayTotal,
+  PULL_REQUEST_AXIS,
+  pullRequestTooltipLine,
   tooltipLine,
   tooltipTitle,
   type ChartPalette,
 } from "../dailyChartConfig";
 import { formatMoney } from "../format";
 
-Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip);
+Chart.register(BarController, BarElement, CategoryScale, LinearScale, LineController, LineElement, PointElement, Tooltip);
 
 function readPalette(element: HTMLElement): ChartPalette {
   const styles = getComputedStyle(element);
@@ -32,11 +37,15 @@ function readPalette(element: HTMLElement): ChartPalette {
   };
 }
 
-function configuration(series: DailySpend[], palette: ChartPalette): ChartConfiguration<"bar"> {
+function configuration(
+  series: DailySpend[],
+  palette: ChartPalette,
+  showPullRequests: boolean,
+): ChartConfiguration<"bar" | "line"> {
   const muted = `color-mix(in oklab, ${palette.text} 55%, transparent)`;
   return {
     type: "bar",
-    data: buildDailyChartData(series, palette),
+    data: buildDailyChartData(series, palette, showPullRequests),
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -56,6 +65,14 @@ function configuration(series: DailySpend[], palette: ChartPalette): ChartConfig
           border: { display: false },
           ticks: { color: muted, font: { size: 10 }, padding: 6, callback: (value) => formatMoney(Number(value)) },
         },
+        [PULL_REQUEST_AXIS]: {
+          display: showPullRequests,
+          position: "right",
+          beginAtZero: true,
+          grid: { display: false },
+          border: { display: false },
+          ticks: { color: muted, font: { size: 10 }, padding: 6, precision: 0 },
+        },
       },
       plugins: {
         tooltip: {
@@ -67,7 +84,10 @@ function configuration(series: DailySpend[], palette: ChartPalette): ChartConfig
           padding: 10,
           callbacks: {
             title: (items) => tooltipTitle(series, items[0]?.dataIndex ?? -1),
-            label: (item) => tooltipLine(item.dataset.label ?? "", item.parsed.y ?? 0, dayTotal(series, item.dataIndex)),
+            label: (item) =>
+              item.dataset.yAxisID === PULL_REQUEST_AXIS
+                ? pullRequestTooltipLine(item.parsed.y ?? 0)
+                : tooltipLine(item.dataset.label ?? "", item.parsed.y ?? 0, dayTotal(series, item.dataIndex)),
           },
           filter: (item) => (item.parsed.y ?? 0) > 0,
         },
@@ -76,14 +96,22 @@ function configuration(series: DailySpend[], palette: ChartPalette): ChartConfig
   };
 }
 
-export function DailySpendChart({ series, label }: { series: DailySpend[]; label: string }) {
+export function DailySpendChart({
+  series,
+  label,
+  showPullRequests,
+}: {
+  series: DailySpend[];
+  label: string;
+  showPullRequests: boolean;
+}) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const target = canvas.current;
     if (!target?.getContext("2d")) return;
-    const chart = new Chart(target, configuration(series, readPalette(target)));
+    const chart = new Chart(target, configuration(series, readPalette(target), showPullRequests));
     return () => chart.destroy();
-  }, [series]);
+  }, [series, showPullRequests]);
   return (
     <div className="relative h-60">
       <canvas ref={canvas} aria-label={label} />

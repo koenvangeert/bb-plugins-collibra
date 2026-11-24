@@ -28,12 +28,12 @@ function response(overrides: Partial<BilledResponse> = {}): BilledResponse {
   };
 }
 
-function dashboardOf(responses: BilledResponse[], indexing = false): DashboardResult {
+function dashboardOf(responses: BilledResponse[], indexing = false, mergedPullRequestsKnown = false): DashboardResult {
   const index = emptySpendIndex();
   responses.forEach((entry, position) => {
     mergeTranscript(index, `${position}.jsonl`, indexTranscript([entry], { sizeBytes: 1, modifiedAt: 1 }));
   });
-  return { ...buildDashboard(index, map, NOW), indexing };
+  return { ...buildDashboard(index, map, NOW), indexing, mergedPullRequestsKnown };
 }
 
 let app: CapturedPluginApp;
@@ -81,6 +81,24 @@ describe("Claude usage page", () => {
     expect(slot.getByText("Fix the panel")).toBeTruthy();
     expect(slot.getByText("claude-opus-5")).toBeTruthy();
     expect(slot.getByText(/Every figure is a lower bound/)).toBeTruthy();
+  });
+
+  it("names merged pull requests in the legend with the window's count", async () => {
+    const dashboard = dashboardOf([response()], false, true);
+    dashboard.dailySeries.at(-1)!.mergedPullRequests = 2;
+    dashboard.dailySeries.at(-2)!.mergedPullRequests = 1;
+    const slot = renderDashboard(() => dashboard);
+
+    const legend = await slot.findByText("Merged PRs");
+
+    expect(legend.textContent).toBe("Merged PRs3");
+  });
+
+  it("leaves merged pull requests out of the legend when GitHub cannot be read", async () => {
+    const slot = renderDashboard(() => dashboardOf([response()]));
+    await slot.findByText("Last 30 days");
+
+    expect(slot.queryByText("Merged PRs")).toBeNull();
   });
 
   it("pages the daily chart back and forward one 30-day window at a time", async () => {

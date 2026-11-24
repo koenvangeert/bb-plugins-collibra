@@ -1,6 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { loadAttributionSource } from "./src/bbAttribution";
 import { MIGRATIONS } from "./src/database";
+import { createGhMergedPullRequestLoader } from "./src/mergedPullRequests";
 import { withRememberedEnvironments } from "./src/environmentStore";
 import { nodeTranscriptFileSystem } from "./src/nodeFileSystem";
 import { runRescanLoop } from "./src/rescanLoop";
@@ -25,6 +26,7 @@ export default async function plugin(bb: BbPluginApi) {
     root: resolveTranscriptRoot(),
     loadAttributionSource: async () =>
       withRememberedEnvironments(db, await loadAttributionSource(bb.sdk)),
+    loadMergedPullRequests: createGhMergedPullRequestLoader(),
     now: () => Date.now(),
     onError,
   });
