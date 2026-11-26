@@ -1,0 +1,290 @@
+{
+ "data": {
+  "search": {
+   "issueCount": 3,
+   "pageInfo": {
+    "hasNextPage": false,
+    "endCursor": null
+   },
+   "nodes": [
+    {
+     "number": 27863,
+     "createdAt": "2026-11-24T16:53:46Z",
+     "mergedAt": "2026-11-24T19:30:57Z",
+     "author": {
+      "login": "IpsitaCollibra"
+     },
+     "labels": {
+      "nodes": [
+       {
+        "name": "released"
+       },
+       {
+        "name": "betty-pr-factory-app"
+       }
+      ]
+     },
+     "comments": {
+      "nodes": [
+       {
+        "author": {
+         "__typename": "User",
+         "login": "IpsitaCollibra"
+        }
+       },
+       {
+        "author": {
+         "__typename": "User",
+         "login": "IpsitaCollibra"
+        }
+       },
+       {
+        "author": {
+         "__typename": "Bot",
+         "login": "github-actions"
+        }
+       },
+       {
+        "author": {
+         "__typename": "Bot",
+         "login": "wiz-22f56a2082"
+        }
+       },
+       {
+        "author": {
+         "__typename": "Bot",
+         "login": "betty-pr-factory-app"
+        }
+       },
+       {
+        "author": {
+         "__typename": "User",
+         "login": "collibra-cicd"
+        }
+       },
+       {
+        "author": {
+         "__typename": "Bot",
+         "login": "github-actions"
+        }
+       }
+      ]
+     },
+     "reviews": {
+      "nodes": [
+       {
+        "author": {
+         "__typename": "User",
+         "login": "IpsitaCollibra"
+        },
+        "body": "Review summary.",
+        "comments": {
+         "totalCount": 0
+        }
+       },
+       {
+        "author": {
+         "__typename": "User",
+         "login": "collibra-cicd"
+        },
+        "body": "",
+        "comments": {
+         "totalCount": 1
+        }
+       },
+       {
+        "author": {
+         "__typename": "User",
+         "login": "willBradleyCollibra"
+        },
+        "body": "",
+        "comments": {
+         "totalCount": 11
+        }
+       },
+       {
+        "author": {
+         "__typename": "User",
+         "login": "willBradleyCollibra"
+        },
+        "body": "",
+        "comments": {
+         "totalCount": 0
+        }
+       },
+       {
+        "author": {
+         "__typename": "User",
+         "login": "collibra-cicd"
+        },
+        "body": "Review summary.",
+        "comments": {
+         "totalCount": 0
+        }
+       },
+       {
+        "author": {
+         "__typename": "User",
+         "login": "costa-collibra"
+        },
+        "body": "",
+        "comments": {
+         "totalCount": 0
+        }
+       }
+      ]
+     }
+    },
+    {
+     "number": 27852,
+     "createdAt": "2026-11-24T14:27:44Z",
+     "mergedAt": "2026-11-24T15:36:46Z",
+     "author": {
+      "login": "lizafesina"
+     },
+     "labels": {
+      "nodes": [
+       {
+        "name": "released"
+       }
+      ]
+     },
+     "comments": {
+      "nodes": [
+       {
+        "author": {
+         "__typename": "Bot",
+         "login": "github-actions"
+        }
+       },
+       {
+        "author": {
+         "__typename": "Bot",
+         "login": "github-actions"
+        }
+       },
+       {
+        "author": {
+         "__typename": "Bot",
+         "login": "github-actions"
+        }
+       }
+      ]
+     },
+     "reviews": {
+      "nodes": [
+       {
+        "author": {
+         "__typename": "User",
+         "login": "maximshipko"
+        },
+        "body": "",
+        "comments": {
+         "totalCount": 0
+        }
+       }
+      ]
+     }
+    },
+    {
+     "number": 27844,
+     "createdAt": "2026-11-24T13:41:12Z",
+     "mergedAt": "2026-11-24T15:29:40Z",
+     "author": {
+      "login": "simondesmetcol"
+     },
+     "labels": {
+      "nodes": [
+       {
+        "name": "released"
+       },
+       {
+        "name": "betty-pr-factory-app"
+       }
+      ]
+     },
+     "comments": {
+      "nodes": [
+       {
+        "author": {
+         "__typename": "User",
+         "login": "simondesmetcol"
+        }
+       },
+       {
+        "author": {
+         "__typename": "Bot",
+         "login": "github-actions"
+        }
+       },
+       {
+        "author": {
+         "__typename": "User",
+         "login": "simondesmetcol"
+        }
+       },
+       {
+        "author": {
+         "__typename": "Bot",
+         "login": "github-actions"
+        }
+       },
+       {
+        "author": {
+         "__typename": "Bot",
+         "login": "betty-pr-factory-app"
+        }
+       },
+       {
+        "author": {
+         "__typename": "Bot",
+         "login": "github-actions"
+        }
+       },
+       {
+        "author": {
+         "__typename": "Bot",
+         "login": "github-actions"
+        }
+       }
+      ]
+     },
+     "reviews": {
+      "nodes": [
+       {
+        "author": {
+         "__typename": "User",
+         "login": "simondesmetcol"
+        },
+        "body": "Review summary.",
+        "comments": {
+         "totalCount": 0
+        }
+       },
+       {
+        "author": {
+         "__typename": "User",
+         "login": "simondesmetcol"
+        },
+        "body": "Review summary.",
+        "comments": {
+         "totalCount": 0
+        }
+       },
+       {
+        "author": {
+         "__typename": "User",
+         "login": "nicolaspirotte"
+        },
+        "body": "",
+        "comments": {
+         "totalCount": 0
+        }
+       }
+      ]
+     }
+    }
+   ]
+  }
+ }
+}
