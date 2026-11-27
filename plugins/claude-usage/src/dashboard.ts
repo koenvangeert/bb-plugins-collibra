@@ -25,7 +25,7 @@ export interface DailySpend {
   day: string
   total: number
   breakdown: CostBreakdown
-  mergedPullRequests: number
+  openedPullRequests: number
 }
 
 export interface ScopeSpend {
@@ -110,7 +110,7 @@ function dailySeriesUpTo(
       day,
       total: bucket?.total ?? 0,
       breakdown: bucket?.breakdown ?? { ...EMPTY_COST },
-      mergedPullRequests: 0,
+      openedPullRequests: 0,
     })
     cursor.setDate(cursor.getDate() - 1)
   }

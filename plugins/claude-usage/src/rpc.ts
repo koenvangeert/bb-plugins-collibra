@@ -37,9 +37,9 @@ const dashboard = z.object({
   }),
   runRatePerDay: z.number(),
   dailySeries: z.array(
-    z.object({ day: z.string(), total: z.number(), breakdown: costBreakdown, mergedPullRequests: z.number() }),
+    z.object({ day: z.string(), total: z.number(), breakdown: costBreakdown, openedPullRequests: z.number() }),
   ),
-  mergedPullRequestsKnown: z.boolean(),
+  openedPullRequestsKnown: z.boolean(),
   byProject: z.array(scopeSpend),
   byThread: z.array(scopeSpend),
   byModel: z.array(z.object({ model: z.string(), total: z.number(), tokens: z.number() })),

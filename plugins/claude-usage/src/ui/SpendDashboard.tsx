@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-import { CHART_SERIES, dailyWindow, MERGED_PULL_REQUESTS_LABEL } from "../dailyChartConfig";
+import { CHART_SERIES, dailyWindow, OPENED_PULL_REQUESTS_LABEL } from "../dailyChartConfig";
 import { formatDayLabel, formatMoney, formatShare, formatTokens } from "../format";
 import type { Dashboard, rpcContract } from "../rpc";
 import { DailySpendChart } from "./DailySpendChart";
@@ -67,7 +67,7 @@ function DailyPanel({ dashboard }: { dashboard: Dashboard }) {
     ? `${formatDayLabel(shown.days[0]!.day)} to ${formatDayLabel(shown.days.at(-1)!.day)}`
     : "";
   const allTime = dashboard.totals.allTime;
-  const mergedInWindow = shown.days.reduce((sum, day) => sum + day.mergedPullRequests, 0);
+  const openedInWindow = shown.days.reduce((sum, day) => sum + day.openedPullRequests, 0);
   return (
     <Panel
       title="Daily spend"
@@ -103,7 +103,7 @@ function DailyPanel({ dashboard }: { dashboard: Dashboard }) {
       <DailySpendChart
         series={shown.days}
         label={`Daily spend from ${range}`}
-        showPullRequests={dashboard.mergedPullRequestsKnown}
+        showPullRequests={dashboard.openedPullRequestsKnown}
       />
       <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
         {CHART_SERIES.map((entry) => (
@@ -116,11 +116,11 @@ function DailyPanel({ dashboard }: { dashboard: Dashboard }) {
             <span className="tabular-nums">{formatShare(allTime.breakdown[entry.key], allTime.total)}</span>
           </span>
         ))}
-        {dashboard.mergedPullRequestsKnown ? (
+        {dashboard.openedPullRequestsKnown ? (
           <span className="flex items-center gap-1.5">
             <span className="h-0.5 w-3 rounded-full bg-foreground" />
-            {MERGED_PULL_REQUESTS_LABEL}
-            <span className="tabular-nums">{mergedInWindow}</span>
+            {OPENED_PULL_REQUESTS_LABEL}
+            <span className="tabular-nums">{openedInWindow}</span>
           </span>
         ) : null}
       </div>
