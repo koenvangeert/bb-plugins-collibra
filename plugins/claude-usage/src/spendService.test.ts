@@ -22,7 +22,7 @@ function dependencies(overrides: Partial<SpendServiceDependencies> = {}): SpendS
     }),
     root: '/home/dev/.claude/projects',
     loadAttributionSource: async () => SOURCE,
-    loadMergedPullRequests: async () => [],
+    loadOpenedPullRequests: async () => [],
     now: () => NOW,
     ...overrides,
   }
@@ -50,31 +50,31 @@ describe('createSpendService', () => {
     expect((await service.refresh()).readPaths).toEqual(['proj/a.jsonl'])
   })
 
-  it('reads merged pull requests after a scan and counts them on the day they merged', async () => {
-    const loadMergedPullRequests = vi.fn(async () => [NOW, NOW])
-    const service = createSpendService(dependencies({ loadMergedPullRequests }))
+  it('reads opened pull requests after a scan and counts them on the day they were opened', async () => {
+    const loadOpenedPullRequests = vi.fn(async () => [NOW, NOW])
+    const service = createSpendService(dependencies({ loadOpenedPullRequests }))
     await service.refresh()
-    await vi.waitFor(() => expect(loadMergedPullRequests).toHaveBeenCalled())
+    await vi.waitFor(() => expect(loadOpenedPullRequests).toHaveBeenCalled())
 
     const dashboard = await service.getDashboard()
 
-    expect(dashboard.mergedPullRequestsKnown).toBe(true)
-    expect(dashboard.dailySeries.at(-1)!.mergedPullRequests).toBe(2)
-    expect(loadMergedPullRequests).toHaveBeenCalledTimes(1)
-    expect(loadMergedPullRequests).toHaveBeenCalledWith(dashboard.dailySeries[0]!.day)
+    expect(dashboard.openedPullRequestsKnown).toBe(true)
+    expect(dashboard.dailySeries.at(-1)!.openedPullRequests).toBe(2)
+    expect(loadOpenedPullRequests).toHaveBeenCalledTimes(1)
+    expect(loadOpenedPullRequests).toHaveBeenCalledWith(dashboard.dailySeries[0]!.day)
   })
 
-  it('still shows spend when merged pull requests cannot be read', async () => {
+  it('still shows spend when opened pull requests cannot be read', async () => {
     const onError = vi.fn()
     const service = createSpendService(
-      dependencies({ loadMergedPullRequests: async () => Promise.reject(new Error('gh missing')), onError }),
+      dependencies({ loadOpenedPullRequests: async () => Promise.reject(new Error('gh missing')), onError }),
     )
     await service.refresh()
     await vi.waitFor(() => expect(onError).toHaveBeenCalled())
 
     const dashboard = await service.getDashboard()
 
-    expect(dashboard.mergedPullRequestsKnown).toBe(false)
+    expect(dashboard.openedPullRequestsKnown).toBe(false)
     expect(dashboard.dailySeries.at(-1)!.total).toBeGreaterThan(0)
   })
 

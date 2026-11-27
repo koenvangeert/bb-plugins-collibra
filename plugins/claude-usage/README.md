@@ -5,7 +5,7 @@ Prices the Claude Code transcripts on the BB server host and shows what they cos
 ## What it adds
 
 - A `Claude usage` page in the sidebar. It shows spend today, over 7 days, over 30 days, and over all indexed history. It also has a 30-day daily chart split by cost component, spend per project, the top 15 threads, and spend per model.
-- A line on the daily chart with the pull requests you merged each day, on its own axis. The server runs `gh search prs --author=@me --merged` every 10 minutes. Without a signed-in `gh`, the line is not shown.
+- A line on the daily chart with the pull requests you opened each day, on its own axis. The server runs `gh search prs --author=@me --created` every 10 minutes. Without a signed-in `gh`, the line is not shown.
 - Today's spend on that sidebar row.
 - The spend of the open thread in the thread header.
 - A banner that names any model the price table has no rate for.

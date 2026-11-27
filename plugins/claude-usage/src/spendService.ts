@@ -1,7 +1,7 @@
 import { buildAttributionMap, type AttributionMap, type AttributionSource } from './attribution'
 import { buildDashboard, buildThreadSpend, type SpendDashboardData, type ThreadSpendData } from './dashboard'
 import type { SqlDatabase } from './database'
-import { createMergedPullRequestCache, withMergedPullRequests } from './mergedPullRequests'
+import { createOpenedPullRequestCache, withOpenedPullRequests } from './openedPullRequests'
 import { loadSpendIndex, saveTranscripts } from './indexStore'
 import { scanTranscripts, type ScanResult, type TranscriptFileSystem } from './scanner'
 import type { SpendIndex } from './spendIndex'
@@ -14,14 +14,14 @@ export interface SpendServiceDependencies {
   fs: TranscriptFileSystem
   root: string
   loadAttributionSource(): Promise<AttributionSource>
-  loadMergedPullRequests(sinceDay: string): Promise<number[]>
+  loadOpenedPullRequests(sinceDay: string): Promise<number[]>
   now(): number
   onError?(message: string, error: unknown): void
 }
 
 export interface DashboardResult extends SpendDashboardData {
   indexing: boolean
-  mergedPullRequestsKnown: boolean
+  openedPullRequestsKnown: boolean
 }
 
 export interface SpendService {
@@ -36,8 +36,8 @@ export function createSpendService(dependencies: SpendServiceDependencies): Spen
   let queue: Promise<unknown> = Promise.resolve()
   let attributionMap: AttributionMap | null = null
   let attributionLoadedAt = 0
-  const mergedPullRequests = createMergedPullRequestCache({
-    load: dependencies.loadMergedPullRequests,
+  const openedPullRequests = createOpenedPullRequestCache({
+    load: dependencies.loadOpenedPullRequests,
     now: dependencies.now,
     onError: dependencies.onError,
   })
@@ -69,26 +69,26 @@ export function createSpendService(dependencies: SpendServiceDependencies): Spen
     return attributionMap
   }
 
-  async function warmMergedPullRequests(): Promise<void> {
+  async function warmOpenedPullRequests(): Promise<void> {
     const dashboard = buildDashboard(index, await currentAttributionMap(), dependencies.now())
-    mergedPullRequests.mergedSince(dashboard.dailySeries[0]!.day)
+    openedPullRequests.openedSince(dashboard.dailySeries[0]!.day)
   }
 
   return {
     refresh(signal) {
       const run = queue.then(() => scanOnce(signal))
       queue = run.catch(() => undefined)
-      void run.then(warmMergedPullRequests, () => undefined)
+      void run.then(warmOpenedPullRequests, () => undefined)
       return run
     },
     async getDashboard() {
       const dashboard = buildDashboard(index, await currentAttributionMap(), dependencies.now())
-      const mergedAt = mergedPullRequests.mergedSince(dashboard.dailySeries[0]!.day)
+      const openedAt = openedPullRequests.openedSince(dashboard.dailySeries[0]!.day)
       return {
         ...dashboard,
-        dailySeries: withMergedPullRequests(dashboard.dailySeries, mergedAt),
+        dailySeries: withOpenedPullRequests(dashboard.dailySeries, openedAt),
         indexing: !scannedOnce && index.transcripts.size === 0,
-        mergedPullRequestsKnown: mergedAt !== null,
+        openedPullRequestsKnown: openedAt !== null,
       }
     },
     async getThreadSpend(threadId) {

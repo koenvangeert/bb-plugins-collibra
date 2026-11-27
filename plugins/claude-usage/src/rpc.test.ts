@@ -10,7 +10,7 @@ const handlers = () =>
       db: migratedDatabase(),
       fs: fakeFileSystem({ proj: null, 'proj/a.jsonl': usageLine({ cwd: '/worktrees/thr_1' }) }),
       root: '/root',
-      loadMergedPullRequests: async () => [],
+      loadOpenedPullRequests: async () => [],
       loadAttributionSource: async () => ({
         projects: [{ id: 'P-1', name: 'frontend', paths: [] }],
         environments: [{ id: 'E-1', projectId: 'P-1', path: '/worktrees/thr_1' }],

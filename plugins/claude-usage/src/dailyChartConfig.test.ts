@@ -24,7 +24,7 @@ function day(overrides: Partial<DailySpend> = {}): DailySpend {
     day: '2026-08-27',
     total: 10,
     breakdown: { input: 1, output: 2, cacheWrite: 3, cacheRead: 4 },
-    mergedPullRequests: 0,
+    openedPullRequests: 0,
     ...overrides,
   }
 }
@@ -55,13 +55,13 @@ describe('buildDailyChartData', () => {
     expect(data.datasets.map((set) => set.data[0])).toEqual([0, 0, 0, 0])
   })
 
-  it('draws merged pull requests as a line on their own axis, outside the spend stack', () => {
-    const data = buildDailyChartData([day({ mergedPullRequests: 3 }), day({ mergedPullRequests: 0 })], palette, true)
+  it('draws opened pull requests as a line on their own axis, outside the spend stack', () => {
+    const data = buildDailyChartData([day({ openedPullRequests: 3 }), day({ openedPullRequests: 0 })], palette, true)
 
     expect(data.datasets).toHaveLength(CHART_SERIES.length + 1)
     expect(data.datasets.at(-1)).toMatchObject({
       type: 'line',
-      label: 'Merged PRs',
+      label: 'Opened PRs',
       data: [3, 0],
       yAxisID: PULL_REQUEST_AXIS,
     })
@@ -92,11 +92,11 @@ describe('tooltip text', () => {
     expect(tooltipLine('Input', 0, 10)).toBe('')
   })
 
-  it('counts merged pull requests instead of pricing them', () => {
-    expect(pullRequestTooltipLine(3)).toBe('Merged PRs: 3')
+  it('counts opened pull requests instead of pricing them', () => {
+    expect(pullRequestTooltipLine(3)).toBe('Opened PRs: 3')
   })
 
-  it('omits merged pull requests on a day without any', () => {
+  it('omits opened pull requests on a day without any', () => {
     expect(pullRequestTooltipLine(0)).toBe('')
   })
 

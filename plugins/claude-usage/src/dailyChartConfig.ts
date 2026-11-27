@@ -26,7 +26,7 @@ export interface ChartPalette {
   surface: string
 }
 
-export const MERGED_PULL_REQUESTS_LABEL = 'Merged PRs'
+export const OPENED_PULL_REQUESTS_LABEL = 'Opened PRs'
 export const PULL_REQUEST_AXIS = 'pullRequests'
 
 interface SpendDataset {
@@ -76,8 +76,8 @@ export function buildDailyChartData(
   }))
   const pullRequests: PullRequestDataset = {
     type: 'line',
-    label: MERGED_PULL_REQUESTS_LABEL,
-    data: series.map((day) => day.mergedPullRequests),
+    label: OPENED_PULL_REQUESTS_LABEL,
+    data: series.map((day) => day.openedPullRequests),
     borderColor: palette.text,
     backgroundColor: palette.text,
     borderWidth: 2,
@@ -127,5 +127,5 @@ export function tooltipLine(label: string, value: number, total: number): string
 }
 
 export function pullRequestTooltipLine(count: number): string {
-  return count > 0 ? `${MERGED_PULL_REQUESTS_LABEL}: ${count}` : ''
+  return count > 0 ? `${OPENED_PULL_REQUESTS_LABEL}: ${count}` : ''
 }
